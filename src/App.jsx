@@ -1507,11 +1507,11 @@ export default function App() {
      PAGE: DASHBOARD
      ════════════════════════════════════════════════════ */
   const [dashPeriod, setDashPeriod] = useState("month"); // day | week | month | year | custom
-  const [dashDateFrom, setDashDateFrom] = useState("2026-03-01");
-  const [dashDateTo, setDashDateTo] = useState("2026-03-16");
+  const [dashDateFrom, setDashDateFrom] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; });
+  const [dashDateTo, setDashDateTo] = useState(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; });
 
   const getDateRange = () => {
-    const now = new Date(2026, 2, 16);
+    const now = new Date();
     let from, to = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
     if (dashPeriod === "day") { from = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0); }
     else if (dashPeriod === "week") { const d = now.getDay(); from = new Date(now); from.setDate(now.getDate() - (d === 0 ? 6 : d - 1)); from.setHours(0,0,0,0); }
@@ -1522,7 +1522,16 @@ export default function App() {
   };
 
   const { from: rangeFrom, to: rangeTo } = getDateRange();
-  const dashOrders = orders.filter(o => o.ts && o.ts >= rangeFrom && o.ts <= rangeTo);
+  const getTs = (o) => {
+    if (o.ts) return typeof o.ts === "number" ? o.ts : Number(o.ts);
+    if (o.date) {
+      // date format: "17/3/2569 10:37" (th-TH locale, พ.ศ.)
+      const m = o.date.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+)/);
+      if (m) { let y = +m[3]; if (y > 2500) y -= 543; return new Date(y, +m[2]-1, +m[1], +m[4], +m[5]).getTime(); }
+    }
+    return 0;
+  };
+  const dashOrders = orders.filter(o => { const t = getTs(o); return t && t >= rangeFrom && t <= rangeTo; });
   const dashCompleted = dashOrders.filter(o => o.status !== "cancelled");
   const dashRevenue = dashCompleted.reduce((s, o) => s + o.total, 0);
   const dashItemCount = dashCompleted.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.qty, 0), 0);
@@ -1532,7 +1541,7 @@ export default function App() {
   const getChartData = () => {
     const groups = {};
     dashCompleted.forEach(o => {
-      const d = new Date(o.ts);
+      const d = new Date(getTs(o));
       let key, sortKey;
       if (dashPeriod === "day") { key = `${d.getHours().toString().padStart(2,"0")}:00`; sortKey = d.getHours(); }
       else if (dashPeriod === "week" || dashPeriod === "custom" || dashPeriod === "month") { key = `${d.getDate()}/${d.getMonth()+1}`; sortKey = d.getFullYear() * 10000 + (d.getMonth()+1) * 100 + d.getDate(); }
