@@ -55,7 +55,10 @@ const Icon = ({ name, size = 18, color = "currentColor", sw = 1.8 }) => {
    COLOR TOKENS
    ═══════════════════════════════════════════ */
 const C = {
-  green50: "#f0fdf4", green100: "#dcfce7", green200: "#bbf7d0", green500: "#22c55e", green600: "#16a34a", green700: "#15803d",
+  // Brand: VANDEE dark red
+  green50: "#fdf2f2", green100: "#fce7e7", green200: "#f5c4c4", green500: "#a52222", green600: "#8B1A1A", green700: "#701515",
+  // Status green (kept for "completed" badges)
+  statusGreen100: "#dcfce7", statusGreen600: "#16a34a", statusGreen700: "#15803d",
   gray50: "#f9fafb", gray100: "#f3f4f6", gray200: "#e5e7eb", gray300: "#d1d5db", gray400: "#9ca3af", gray500: "#6b7280", gray600: "#4b5563", gray700: "#374151", gray800: "#1f2937", gray900: "#111827",
   red50: "#fef2f2", red500: "#ef4444", red600: "#dc2626",
   amber50: "#fffbeb", amber100: "#fef3c7", amber600: "#d97706", amber700: "#b45309",
@@ -664,7 +667,7 @@ export default function App() {
 
   const resetShop = () => { setCart([]); setAddress({ name: "", phone: "", addr: "", district: "", amphoe: "", province: "", zip: "", note: "" }); setSlipFile(null); setSlipPreview(null); setConfirmed(false); setSelectedShipping("standard"); setStep(STEPS.MENU); };
 
-  const statusMap = { pending: { label: "รอตรวจสอบ", bg: C.amber100, color: C.amber700 }, shipped: { label: "จัดส่งแล้ว", bg: C.blue50, color: C.blue600 }, completed: { label: "สำเร็จ", bg: C.green100, color: C.green700 }, cancelled: { label: "ยกเลิก", bg: C.red50, color: C.red600 } };
+  const statusMap = { pending: { label: "รอตรวจสอบ", bg: C.amber100, color: C.amber700 }, shipped: { label: "จัดส่งแล้ว", bg: C.blue50, color: C.blue600 }, completed: { label: "สำเร็จ", bg: C.statusGreen100, color: C.statusGreen700 }, cancelled: { label: "ยกเลิก", bg: C.red50, color: C.red600 } };
 
   /* ════════════════════════════════════════════════════
      PAGE: SHOP (Storefront with 4-step checkout)
@@ -1571,7 +1574,7 @@ export default function App() {
   const statusBreakdown = [
     { key: "pending", label: "รอตรวจสอบ", count: dashOrders.filter(o => o.status === "pending").length, color: C.amber600 },
     { key: "shipped", label: "จัดส่งแล้ว", count: dashOrders.filter(o => o.status === "shipped").length, color: C.blue600 },
-    { key: "completed", label: "สำเร็จ", count: dashOrders.filter(o => o.status === "completed").length, color: C.green600 },
+    { key: "completed", label: "สำเร็จ", count: dashOrders.filter(o => o.status === "completed").length, color: C.statusGreen600 },
     { key: "cancelled", label: "ยกเลิก", count: dashOrders.filter(o => o.status === "cancelled").length, color: C.red500 },
   ];
 
@@ -1613,10 +1616,10 @@ export default function App() {
       {/* KPI Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 20 }}>
         {[
-          { label: "รายรับรวม", value: `${dashRevenue.toLocaleString()}฿`, sub: `${dashCompleted.length} ออเดอร์`, icon: "dollarSign", grad: "linear-gradient(135deg, #dcfce7, #f0fdf4)", ic: C.green600, accent: C.green600 },
+          { label: "รายรับรวม", value: `${dashRevenue.toLocaleString()}฿`, sub: `${dashCompleted.length} ออเดอร์`, icon: "dollarSign", grad: "linear-gradient(135deg, #fce7e7, #fdf2f2)", ic: C.green600, accent: C.green600 },
           { label: "จำนวนออเดอร์", value: dashOrders.length, sub: `${dashOrders.filter(o=>o.status!=="cancelled").length} ที่ไม่ยกเลิก`, icon: "clipboard", grad: "linear-gradient(135deg, #dbeafe, #eff6ff)", ic: C.blue600, accent: C.blue600 },
           { label: "สินค้าขายได้", value: `${dashItemCount} ชิ้น`, sub: `จาก ${dashCompleted.length} ออเดอร์`, icon: "package", grad: "linear-gradient(135deg, #fef3c7, #fffbeb)", ic: C.amber600, accent: C.amber600 },
-          { label: "ยอดเฉลี่ย/ออเดอร์", value: `${dashAvg.toLocaleString()}฿`, sub: "ไม่รวมยกเลิก", icon: "barChart", grad: "linear-gradient(135deg, #dcfce7, #f0fdf4)", ic: C.green700, accent: C.green700 },
+          { label: "ยอดเฉลี่ย/ออเดอร์", value: `${dashAvg.toLocaleString()}฿`, sub: "ไม่รวมยกเลิก", icon: "barChart", grad: "linear-gradient(135deg, #fce7e7, #fdf2f2)", ic: C.green700, accent: C.green700 },
         ].map((s, i) => (
           <div className="card-hover" key={i} style={{ background: C.white, borderRadius: 14, padding: "20px 22px", border: `1px solid ${C.gray100}`, position: "relative", overflow: "hidden", animation: `countUp 0.4s ease-out ${i * 0.1}s both` }}>
             <div style={{ position: "absolute", top: 0, right: 0, width: 80, height: 80, background: s.grad, borderRadius: "0 14px 0 40px", opacity: 0.7 }} />
@@ -2108,7 +2111,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
   if (!authLoaded) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans Thai', sans-serif", color: C.gray400 }}><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />กำลังโหลด...</div>;
 
   if (!isLoggedIn) return (
-    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #065f46 0%, #16a34a 50%, #4ade80 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans Thai', 'Noto Sans Thai', sans-serif", position: "relative", overflow: "hidden" }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #4a0e0e 0%, #8B1A1A 50%, #c44040 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'IBM Plex Sans Thai', 'Noto Sans Thai', sans-serif", position: "relative", overflow: "hidden" }}>
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
       <style>{`
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -2133,7 +2136,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
       {/* Loading overlay */}
       {loginLoading && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(255,255,255,0.95)", zIndex: 9999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 20 }}>
-          <div style={{ width: 56, height: 56, borderRadius: 14, background: C.green600, display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 800, fontSize: 24, animation: "pulse 1.5s infinite" }}>V</div>
+          <img src={import.meta.env.BASE_URL + "vandee-logo.jpg"} alt="VANDEE" style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover", animation: "pulse 1.5s infinite" }} />
           <div style={{ width: 40, height: 40, border: `3px solid ${C.gray200}`, borderTopColor: C.green600, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
           <div style={{ fontSize: 14, color: C.gray500, fontWeight: 600 }}>กำลังเข้าสู่ระบบ...</div>
         </div>
@@ -2152,7 +2155,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
 
       <div style={{ width: 400, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", borderRadius: 20, padding: "44px 40px", boxShadow: "0 20px 60px rgba(0,0,0,0.15)", border: "1px solid rgba(255,255,255,0.3)", animation: "cardIn 0.6s ease-out", position: "relative", zIndex: 1 }}>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 16, background: "linear-gradient(135deg, #16a34a, #4ade80)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 800, fontSize: 28, marginBottom: 14, boxShadow: "0 8px 24px rgba(22,163,74,0.3)" }}>V</div>
+          <img src={import.meta.env.BASE_URL + "vandee-logo.jpg"} alt="VANDEE" style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover", marginBottom: 14, boxShadow: "0 8px 24px rgba(139,26,26,0.3)" }} />
           <div style={{ fontWeight: 700, fontSize: 22, color: C.gray900, letterSpacing: -0.5 }}>VANDEE SHOP</div>
           <div style={{ fontSize: 13, color: C.gray400, marginTop: 4 }}>ระบบจัดการร้านค้าของฝาก</div>
         </div>
@@ -2171,9 +2174,9 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
           <span onClick={() => !loginLoading && setRememberMe(!rememberMe)} style={{ fontSize: 13, color: C.gray600, cursor: loginLoading ? "default" : "pointer", userSelect: "none" }}>จดจำรหัสผ่าน</span>
         </div>
         {loginError && <div style={{ marginBottom: 16, padding: "10px 14px", borderRadius: 8, background: C.red50, color: C.red500, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}><Icon name="info" size={14} color={C.red500} /> {loginError}</div>}
-        <button onClick={() => { sfx.tap(); handleLogin(); }} disabled={loginLoading} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: loginLoading ? C.gray300 : "linear-gradient(135deg, #16a34a, #15803d)", color: C.white, fontWeight: 700, fontSize: 15, cursor: loginLoading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: loginLoading ? "none" : "0 4px 16px rgba(22,163,74,0.3)" }}
-          onMouseEnter={e => { if (!loginLoading) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(22,163,74,0.4)"; } }}
-          onMouseLeave={e => { if (!loginLoading) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(22,163,74,0.3)"; } }}
+        <button onClick={() => { sfx.tap(); handleLogin(); }} disabled={loginLoading} style={{ width: "100%", padding: "14px 20px", borderRadius: 12, border: "none", background: loginLoading ? C.gray300 : "linear-gradient(135deg, #8B1A1A, #701515)", color: C.white, fontWeight: 700, fontSize: 15, cursor: loginLoading ? "not-allowed" : "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, transition: "all 0.2s", boxShadow: loginLoading ? "none" : "0 4px 16px rgba(139,26,26,0.3)" }}
+          onMouseEnter={e => { if (!loginLoading) { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 20px rgba(139,26,26,0.4)"; } }}
+          onMouseLeave={e => { if (!loginLoading) { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(139,26,26,0.3)"; } }}
         ><Icon name="lock" size={16} /> {loginLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}</button>
       </div>
     </div>
@@ -2195,7 +2198,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
       {/* Left sidebar nav */}
       <div style={{ width: 230, flexShrink: 0, background: "linear-gradient(180deg, #ffffff 0%, #f8faf9 100%)", borderRight: `1px solid ${C.gray100}`, padding: "20px 14px", position: "sticky", top: 0, height: "100vh", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "0 8px", marginBottom: 28 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: "linear-gradient(135deg, #16a34a, #4ade80)", display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 800, fontSize: 17, boxShadow: "0 4px 12px rgba(22,163,74,0.25)" }}>V</div>
+          <img src={import.meta.env.BASE_URL + "vandee-logo.jpg"} alt="VANDEE" style={{ width: 38, height: 38, borderRadius: 10, objectFit: "cover", boxShadow: "0 4px 12px rgba(139,26,26,0.25)" }} />
           <div><div style={{ fontWeight: 700, fontSize: 15, letterSpacing: -0.3 }}>VANDEE SHOP</div><div style={{ fontSize: 10, color: C.gray400, marginTop: -1 }}>ระบบจัดการร้านค้า</div></div>
         </div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 3, flex: 1 }}>
@@ -2217,7 +2220,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
         {/* User profile */}
         <div style={{ borderTop: `1px solid ${C.gray200}`, paddingTop: 14, marginTop: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, background: C.gray50 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #16a34a, #4ade80)", display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{credentials.user?.charAt(0)?.toUpperCase() || "V"}</div>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #8B1A1A, #c44040)", display: "flex", alignItems: "center", justifyContent: "center", color: C.white, fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{credentials.user?.charAt(0)?.toUpperCase() || "V"}</div>
             <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 12, fontWeight: 600, color: C.gray700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{credentials.user}</div><div style={{ fontSize: 10, color: C.gray400 }}>ผู้ดูแลระบบ</div></div>
           </div>
         </div>
