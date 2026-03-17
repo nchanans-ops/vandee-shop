@@ -971,7 +971,10 @@ export default function App() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, paddingTop: 16 }}>
                     {/* Recipient */}
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: C.gray500, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}><Icon name="mapPin" size={13} color={C.gray400} /> ข้อมูลผู้รับ</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.gray500, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                        <Icon name="mapPin" size={13} color={C.gray400} /> ข้อมูลผู้รับ
+                        <button onClick={() => { const txt = `${o.address.name}\n${o.address.phone}\n${o.address.addr}\n${o.address.district} ${o.address.province} ${o.address.zip}${o.address.note ? "\n" + o.address.note : ""}`; navigator.clipboard.writeText(txt).then(() => { sfx.success(); const el = document.getElementById("copy-addr-" + o.id); if (el) { el.textContent = "คัดลอกแล้ว"; setTimeout(() => el.textContent = "คัดลอก", 1500); } }); }} style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 6, border: `1px solid ${C.gray200}`, background: C.white, color: C.gray500, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 4, transition: "all 0.15s" }}><Icon name="clipboard" size={11} color={C.gray400} /><span id={"copy-addr-" + o.id}>คัดลอก</span></button>
+                      </div>
                       <div style={{ fontSize: 13, lineHeight: 1.8 }}>
                         <div><strong>{o.address.name}</strong></div>
                         <div style={{ color: C.gray500 }}>{o.address.phone}</div>
