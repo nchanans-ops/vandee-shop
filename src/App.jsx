@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import THAI_ADDR_DB from "./thaiAddr";
+import {
+  fbGetOrders, fbUpsertOrder, fbDeleteOrder,
+  fbGetSetting, fbSetSetting,
+  fbGetProducts, fbSetProducts,
+  fbOnOrders,
+} from "./firebase";
 
 /* ═══════════════════════════════════════════
    SVG ICON SYSTEM
@@ -118,34 +124,16 @@ const Img = ({ product, style: s, imgErr, setImgErr }) => imgErr[product.id]
   : <img src={product.img} alt={product.name} loading="lazy" onError={() => setImgErr(p => ({ ...p, [product.id]: true }))} style={{ ...s, objectFit: "cover" }} />;
 
 /* ═══════════════════════════════════════════
-   SUPABASE CLIENT + SYNC
+   FIREBASE CLIENT + SYNC
    ═══════════════════════════════════════════ */
-const SUPABASE_URL = "https://npgkebfxtxqvrdfgbgii.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5wZ2tlYmZ4dHhxdnJkZmdiZ2lpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzIxMTcsImV4cCI6MjA4OTIwODExN30.lFUkLSbR56D0gpnnBHbJpKKYaV-S9WvcI4fJqpdAlfc";
-const SB_HEADERS = { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation" };
-
 const sb = {
-  async getOrders() {
-    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/orders?select=*&order=created_at.desc`, { headers: SB_HEADERS }); const d = await r.json(); return d.map(row => row.data); } catch { return null; }
-  },
-  async upsertOrder(order) {
-    try { await fetch(`${SUPABASE_URL}/rest/v1/orders?on_conflict=id`, { method: "POST", headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify({ id: order.id, data: order }) }); } catch {}
-  },
-  async deleteOrder(id) {
-    try { await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${id}`, { method: "DELETE", headers: SB_HEADERS }); } catch {}
-  },
-  async getSetting(key) {
-    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/settings?key=eq.${key}&select=data`, { headers: SB_HEADERS }); const d = await r.json(); return d[0]?.data || null; } catch { return null; }
-  },
-  async setSetting(key, data) {
-    try { await fetch(`${SUPABASE_URL}/rest/v1/settings?on_conflict=key`, { method: "POST", headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify({ key, data }) }); } catch {}
-  },
-  async getProducts() {
-    try { const r = await fetch(`${SUPABASE_URL}/rest/v1/products?id=eq.main&select=data`, { headers: SB_HEADERS }); const d = await r.json(); return d[0]?.data || null; } catch { return null; }
-  },
-  async setProducts(data) {
-    try { await fetch(`${SUPABASE_URL}/rest/v1/products?on_conflict=id`, { method: "POST", headers: { ...SB_HEADERS, "Prefer": "resolution=merge-duplicates" }, body: JSON.stringify({ id: "main", data }) }); } catch {}
-  },
+  getOrders: fbGetOrders,
+  upsertOrder: fbUpsertOrder,
+  deleteOrder: fbDeleteOrder,
+  getSetting: fbGetSetting,
+  setSetting: fbSetSetting,
+  getProducts: fbGetProducts,
+  setProducts: fbSetProducts,
 };
 
 // Also keep localStorage as local cache + session/remember
@@ -569,7 +557,7 @@ export default function App() {
 
   // Save to localStorage immediately, Supabase debounced
   const sbSaveTimer = useRef(null);
-  const saveToSupabase = useCallback(() => {
+  const saveToFirebase = useCallback(() => {
     clearTimeout(sbSaveTimer.current);
     sbSaveTimer.current = setTimeout(() => {
       if (products.length > 0) sb.setProducts(products);
@@ -579,29 +567,24 @@ export default function App() {
   }, [products, categories, shippingMethods]);
 
   useEffect(() => { if (loaded) { saveStore(STORE_KEYS.orders, orders.map(o => { const { slipData, ...rest } = o; return rest; })); } }, [orders, loaded]);
-  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.products, products); saveToSupabase(); } }, [products, loaded]);
-  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.categories, categories); saveToSupabase(); } }, [categories, loaded]);
-  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.shipping, shippingMethods); saveToSupabase(); } }, [shippingMethods, loaded]);
+  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.products, products); saveToFirebase(); } }, [products, loaded]);
+  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.categories, categories); saveToFirebase(); } }, [categories, loaded]);
+  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.shipping, shippingMethods); saveToFirebase(); } }, [shippingMethods, loaded]);
 
-  // Poll other devices every 15s
+  // Real-time listener via Firebase onSnapshot
   useEffect(() => {
     if (!loaded) return;
-    const poll = setInterval(async () => {
-      if (isEditing.current || document.querySelector('[data-page="shop"]')) return;
-      try {
-        const sbOrders = await sb.getOrders();
-        if (sbOrders) {
-          const filtered = sbOrders.filter(o => !deletedIds.current.has(o.id));
-          setOrders(prev => {
-            const prevKey = prev.map(o => o.id + o.status).join(",");
-            const newKey = filtered.map(o => o.id + o.status).join(",");
-            return prevKey !== newKey ? filtered : prev;
-          });
-        }
-      } catch {}
-    }, 15000);
+    const unsub = fbOnOrders((incoming) => {
+      if (isEditing.current) return;
+      const filtered = incoming.filter(o => !deletedIds.current.has(o.id));
+      setOrders(prev => {
+        const prevKey = prev.map(o => o.id + o.status).join(",");
+        const newKey = filtered.map(o => o.id + o.status).join(",");
+        return prevKey !== newKey ? filtered : prev;
+      });
+    });
     const cleanDel = setInterval(() => deletedIds.current.clear(), 60000);
-    return () => { clearInterval(poll); clearInterval(cleanDel); };
+    return () => { unsub(); clearInterval(cleanDel); };
   }, [loaded]);
 
   const saveSheetUrl = async (url) => { setSheetUrl(url); try { await window.storage.set(SHEET_URL_KEY, url); } catch {} sb.setSetting("sheetUrl", url); };
