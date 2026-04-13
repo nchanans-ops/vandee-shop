@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/back-vandee/',
+  base: '/vandee-shop/',
   plugins: [
     react(),
     VitePWA({
@@ -17,8 +17,8 @@ export default defineConfig({
         background_color: '#f5f6f8',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/back-vandee/',
-        scope: '/back-vandee/',
+        start_url: '/vandee-shop/',
+        scope: '/vandee-shop/',
         icons: [
           {
             src: 'icon-192.png',
