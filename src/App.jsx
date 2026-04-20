@@ -2616,6 +2616,7 @@ export default function App() {
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สรุปภาพรวม</div>
             <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              <tbody>
               {/* รายรับ */}
               <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
                 <td style={{ padding: "9px 0", color: C.gray500 }}>รายรับรวม</td>
@@ -2656,6 +2657,7 @@ export default function App() {
                 <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
                 <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
               </tr>
+              </tbody>
             </table>
             <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Net Margin {margin}%</div>
