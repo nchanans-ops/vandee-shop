@@ -939,6 +939,7 @@ export default function App() {
      ════════════════════════════════════════════════════ */
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [orderFilter, setOrderFilter] = useState("all");
+  const [editingOrder, setEditingOrder] = useState(null); // { id, date, status, address: {...} }
 
   const filteredOrders = orderFilter === "all" ? orders : orders.filter(o => o.status === orderFilter);
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
@@ -985,8 +986,8 @@ export default function App() {
               onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.04)"}
               onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
               {/* Header row */}
-              <div onClick={() => setExpandedOrder(open ? null : o.id)} style={{ padding: "16px 20px", cursor: "pointer", display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ flex: 1 }}>
+              <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+                <div onClick={() => setExpandedOrder(open ? null : o.id)} style={{ flex: 1, cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 14, color: C.gray900 }}>{o.id}</span>
                     <span style={{ background: st.bg, color: st.color, padding: "2px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700 }}>{st.label}</span>
@@ -1000,12 +1001,81 @@ export default function App() {
                 <div style={{ textAlign: "right", marginRight: 8 }}>
                   <div style={{ fontWeight: 800, fontSize: 18, color: C.green600 }}>{o.total.toLocaleString()}฿</div>
                 </div>
-                <Icon name={open ? "chevUp" : "chevDown"} size={18} color={C.gray400} />
+                <button onClick={(e) => { e.stopPropagation(); setEditingOrder(editingOrder?.id === o.id ? null : { id: o.id, date: o.date, status: o.status, address: { ...o.address } }); setExpandedOrder(o.id); }} style={{ background: editingOrder?.id === o.id ? C.green50 : "none", border: `1px solid ${editingOrder?.id === o.id ? C.green600 : C.gray200}`, borderRadius: 7, padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                  <Icon name="edit" size={15} color={editingOrder?.id === o.id ? C.green600 : C.gray400} />
+                </button>
+                <div onClick={() => setExpandedOrder(open ? null : o.id)} style={{ cursor: "pointer" }}>
+                  <Icon name={open ? "chevUp" : "chevDown"} size={18} color={C.gray400} />
+                </div>
               </div>
 
               {/* Expanded detail */}
               {open && (
                 <div style={{ borderTop: `1px solid ${C.gray100}`, padding: "0 20px 20px" }}>
+
+                  {/* EDIT MODE */}
+                  {editingOrder?.id === o.id ? (
+                    <div style={{ paddingTop: 16 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: C.green700, marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                        <Icon name="edit" size={14} color={C.green600} /> แก้ไขข้อมูล order
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>วันที่/เวลา</label>
+                          <input value={editingOrder.date} onChange={e => setEditingOrder(p => ({ ...p, date: e.target.value }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>สถานะ</label>
+                          <select value={editingOrder.status} onChange={e => setEditingOrder(p => ({ ...p, status: e.target.value }))} style={{ ...inp, fontSize: 13, background: C.white }}>
+                            <option value="pending">รอตรวจสอบ</option>
+                            <option value="shipped">จัดส่งแล้ว</option>
+                            <option value="completed">สำเร็จ</option>
+                            <option value="cancelled">ยกเลิก</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ชื่อผู้รับ</label>
+                          <input value={editingOrder.address.name || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, name: e.target.value } }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>โทรศัพท์</label>
+                          <input value={editingOrder.address.phone || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, phone: e.target.value } }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div style={{ gridColumn: "1/-1" }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ที่อยู่</label>
+                          <input value={editingOrder.address.addr || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, addr: e.target.value } }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จังหวัด</label>
+                          <input value={editingOrder.address.province || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, province: e.target.value } }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รหัสไปรษณีย์</label>
+                          <input value={editingOrder.address.zip || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, zip: e.target.value } }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                        <div style={{ gridColumn: "1/-1" }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมายเหตุ</label>
+                          <input value={editingOrder.address.note || ""} onChange={e => setEditingOrder(p => ({ ...p, address: { ...p.address, note: e.target.value } }))} placeholder="หมายเหตุ (ถ้ามี)" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <BtnP onClick={() => {
+                          const updated = { ...o, date: editingOrder.date, status: editingOrder.status, address: editingOrder.address };
+                          isEditing.current = true;
+                          setOrders(prev => prev.map(x => x.id === o.id ? updated : x));
+                          const { slipData: _sd, ...orderClean } = updated;
+                          sb.upsertOrder(orderClean);
+                          syncOrder(updated);
+                          setEditingOrder(null);
+                          sfx.success();
+                          setTimeout(() => { isEditing.current = false; }, 2000);
+                        }} style={{ padding: "9px 20px" }}>
+                          <Icon name="save" size={14} /> บันทึก
+                        </BtnP>
+                        <BtnO onClick={() => setEditingOrder(null)} style={{ padding: "9px 16px" }}>ยกเลิก</BtnO>
+                      </div>
+                    </div>
+                  ) : (<>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, paddingTop: 16 }}>
                     {/* Recipient */}
                     <div>
@@ -1131,6 +1201,7 @@ export default function App() {
                       onMouseLeave={e => { e.currentTarget.style.background = C.white; }}
                     ><Icon name="trash" size={14} color={C.red500} /> ลบคำสั่งซื้อ</button>
                   </div>
+                  </>)}
                 </div>
               )}
             </div>
