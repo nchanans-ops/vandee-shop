@@ -2482,7 +2482,7 @@ export default function App() {
     const chartExpenses = chartMonths.map(m => expenses.filter(e => e.date?.slice(0,7) === m.key).reduce((s, e) => s + (e.amount || 0), 0));
     const chartProfit = chartMonths.map((_, i) => chartRevenue[i] - chartExpenses[i]);
 
-    const donutColors = ["#8B1A1A","#c44040","#e07070","#2563eb","#d97706","#6b7280"];
+    const donutColors = ["#8B1A1A","#a52222","#c44040","#d97706","#6b7280","#374151"];
 
     const filterLabels = [
       { key: "month", label: "เดือนนี้" },
@@ -2514,9 +2514,9 @@ export default function App() {
         {/* KPI cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
           {[
-            { label: "รายรับ", value: `${totalRevenue.toLocaleString()}฿`, sub: `${filtOrders.length} ออเดอร์`, color: C.statusGreen600 },
-            { label: "รายจ่ายรวม", value: `${totalExpenses.toLocaleString()}฿`, sub: `${filtExpenses.length} รายการ`, color: C.red600 },
-            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: parseFloat(margin) >= 50 ? C.statusGreen600 : C.amber600 },
+            { label: "รายรับ", value: `${totalRevenue.toLocaleString()}฿`, sub: `${filtOrders.length} ออเดอร์`, color: C.green600 },
+            { label: "รายจ่ายรวม", value: `${totalExpenses.toLocaleString()}฿`, sub: `${filtExpenses.length} รายการ`, color: C.gray600 },
+            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: C.green700 },
             { label: "ส่วนลดที่ให้", value: `${totalDiscount.toLocaleString()}฿`, sub: `${filtOrders.filter(o => o.discount > 0).length} ออเดอร์`, color: C.amber600 },
           ].map((k, i) => (
             <div key={i} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
@@ -2534,7 +2534,7 @@ export default function App() {
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 8 }}>รายรับ vs รายจ่าย vs กำไร (6 เดือนล่าสุด)</div>
             <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              {[["#16a34a","รายรับ"],["#dc2626","รายจ่าย"],["#2563eb","กำไร"]].map(([c,l]) => (
+              {[["#8B1A1A","รายรับ"],["#d1d5db","รายจ่าย"],["#701515","กำไร"]].map(([c,l]) => (
                 <span key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.gray500 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block" }} />{l}
                 </span>
@@ -2594,9 +2594,9 @@ export default function App() {
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สรุปภาพรวม</div>
             <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
               {[
-                { label: "รายรับรวม", value: `${totalRevenue.toLocaleString()}฿`, color: C.statusGreen600 },
-                { label: "ต้นทุนสินค้า", value: `-${costOfGoods.toLocaleString()}฿`, color: C.red600 },
-                { label: "ค่าใช้จ่ายอื่น", value: `-${otherExp.toLocaleString()}฿`, color: C.red600 },
+                { label: "รายรับรวม", value: `${totalRevenue.toLocaleString()}฿`, color: C.green600 },
+                { label: "ต้นทุนสินค้า", value: `-${costOfGoods.toLocaleString()}฿`, color: C.gray600 },
+                { label: "ค่าใช้จ่ายอื่น", value: `-${otherExp.toLocaleString()}฿`, color: C.gray600 },
                 { label: "ส่วนลดที่ให้", value: `-${totalDiscount.toLocaleString()}฿`, color: C.amber600 },
               ].map((r, i) => (
                 <tr key={i} style={{ borderBottom: `1px solid ${C.gray100}` }}>
@@ -2606,13 +2606,13 @@ export default function App() {
               ))}
               <tr>
                 <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
-                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
+                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.green600 : C.gray700 }}>{grossProfit.toLocaleString()}฿</td>
               </tr>
             </table>
             <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
               <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Gross Margin {margin}%</div>
               <div style={{ background: C.gray200, borderRadius: 4, height: 5, marginTop: 6 }}>
-                <div style={{ background: parseFloat(margin) >= 50 ? C.green600 : C.amber600, width: `${Math.min(parseFloat(margin),100)}%`, height: 5, borderRadius: 4 }} />
+                <div style={{ background: C.green600, width: `${Math.min(parseFloat(margin),100)}%`, height: 5, borderRadius: 4 }} />
               </div>
             </div>
           </div>
@@ -2653,9 +2653,9 @@ export default function App() {
           data: {
             labels,
             datasets: [
-              { label: "รายรับ", data: revenue, backgroundColor: "#16a34a" },
-              { label: "รายจ่าย", data: expensesData, backgroundColor: "#dc2626" },
-              { label: "กำไร", data: profit, backgroundColor: "#2563eb" },
+              { label: "รายรับ", data: revenue, backgroundColor: "#8B1A1A" },
+              { label: "รายจ่าย", data: expensesData, backgroundColor: "#d1d5db" },
+              { label: "กำไร", data: profit, backgroundColor: "#701515" },
             ],
           },
           options: {
@@ -2670,7 +2670,7 @@ export default function App() {
       }
       if (donutEl && catNames.length > 0) {
         if (donutEl._chartInstance) donutEl._chartInstance.destroy();
-        const donutColors = ["#8B1A1A","#c44040","#e07070","#2563eb","#d97706","#6b7280"];
+        const donutColors = ["#8B1A1A","#a52222","#c44040","#d97706","#6b7280","#374151"];
         donutEl._chartInstance = new window.Chart(donutEl, {
           type: "doughnut",
           data: { labels: catNames, datasets: [{ data: catVals, backgroundColor: catNames.map((_, i) => donutColors[i] || "#9ca3af"), borderWidth: 0 }] },
