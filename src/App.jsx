@@ -610,6 +610,20 @@ export default function App() {
   const syncOrder = async (order) => { if (!sheetUrl) return; setSyncStatus("syncing"); const r = await syncOrderToSheet(sheetUrl, order); setSyncStatus(r.ok ? "success" : "error"); setTimeout(() => setSyncStatus(""), 3000); };
   const syncAll = async () => { if (!sheetUrl) return; setSyncStatus("syncing"); const r = await syncAllOrdersToSheet(sheetUrl, orders); setSyncStatus(r.ok ? "success" : "error"); setTimeout(() => setSyncStatus(""), 3000); };
 
+  const syncExpenseToSheet = async (expense) => {
+    if (!sheetUrl) return;
+    try {
+      await fetch(sheetUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "expense", expense }) });
+    } catch {}
+  };
+
+  const syncAllExpensesToSheet = async () => {
+    if (!sheetUrl) return;
+    try {
+      await fetch(sheetUrl, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "expenseSyncAll", expenses }) });
+    } catch {}
+  };
+
   /* Cart helpers */
   const addToCart = (p) => setCart(prev => {
     const ex = prev.find(i => i.id === p.id);
@@ -2117,6 +2131,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
       setExpenses(prev => [newExp, ...prev]);
       setExpenseForm({ name: "", amount: "", date: new Date().toISOString().slice(0,10), cat: expenseForm.cat, note: "" });
       sfx.success();
+      syncExpenseToSheet(newExp);
       setTimeout(() => { isEditing.current = false; }, 2000);
     };
 
@@ -2287,6 +2302,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
               </select>
               <div style={{ marginLeft: "auto", fontSize: 12, color: C.gray400 }}>{filteredExpenses.length} รายการ</div>
               <BtnO onClick={exportExpensesCSV} style={{ padding: "7px 12px", fontSize: 12 }}><Icon name="download" size={13} /> Export CSV</BtnO>
+              {sheetUrl && <BtnO onClick={syncAllExpensesToSheet} style={{ padding: "7px 12px", fontSize: 12 }}><Icon name="refreshCw" size={13} /> Sync Sheet</BtnO>}
             </div>
 
             {/* Table header */}
