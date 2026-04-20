@@ -2534,7 +2534,7 @@ export default function App() {
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 8 }}>รายรับ vs รายจ่าย vs กำไร (6 เดือนล่าสุด)</div>
             <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              {[["#8B1A1A","รายรับ"],["#d1d5db","รายจ่าย"],["#701515","กำไร"]].map(([c,l]) => (
+              {[["#8B1A1A","รายรับ"],["#9ca3af","รายจ่าย"],["#16a34a","กำไร"]].map(([c,l]) => (
                 <span key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.gray500 }}>
                   <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block" }} />{l}
                 </span>
@@ -2654,8 +2654,8 @@ export default function App() {
             labels,
             datasets: [
               { label: "รายรับ", data: revenue, backgroundColor: "#8B1A1A" },
-              { label: "รายจ่าย", data: expensesData, backgroundColor: "#d1d5db" },
-              { label: "กำไร", data: profit, backgroundColor: "#701515" },
+              { label: "รายจ่าย", data: expensesData, backgroundColor: "#9ca3af" },
+              { label: "กำไร", data: profit, backgroundColor: "#16a34a" },
             ],
           },
           options: {
