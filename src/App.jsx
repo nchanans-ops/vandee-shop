@@ -2493,18 +2493,15 @@ export default function App() {
 
     const revenue = activeOrders.reduce((s, o) => s + (o.total || 0), 0);
     const totalDiscount = activeOrders.reduce((s, o) => s + (o.discount || 0), 0);
-    const cogs = activeOrders.reduce((s, o) =>
-      s + (o.items || []).reduce((ss, item) => {
-        const p = products.find(x => x.id === item.id);
-        return ss + (p?.cost || 0) * item.qty;
-      }, 0), 0);
-    // expenses ที่ใช้คำนวณ = ทุกหมวด ยกเว้น "ต้นทุนสินค้า" (เพราะใช้ COGS แทน)
+    // COGS = expenses หมวด ต้นทุนสินค้า (จากล็อต)
+    const costExp = activeExp.filter(e => e.cat === 'ต้นทุนสินค้า');
+    const cogs = costExp.reduce((s, e) => s + (e.amount || 0), 0);
     const opExp = activeExp.filter(e => e.cat !== 'ต้นทุนสินค้า');
     const totalExp = opExp.reduce((s, e) => s + (e.amount || 0), 0);
     const netProfit = revenue - cogs - totalExp - totalDiscount;
     const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0.0';
 
-    // แสดงในตาราง: แยก COGS (จาก cost×qty) และ OpEx แยกหมวด
+    // ตารางสรุป: แสดง COGS แยก + OpEx แยกหมวด
     const expByCat = {};
     opExp.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
     const expCatRows = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
@@ -2776,7 +2773,7 @@ export default function App() {
         ts: Date.now(),
       };
       setExpenses(prev => [newExp, ...prev]);
-      setLotDate(new Date().toISOString().slice(0,10));
+      syncExpenseToSheet(newExp);
       setLotTotalCost("");
       setLotNote("");
       setLotItems([{ productId: "", qty: "", unit: "" }]);
