@@ -2725,61 +2725,91 @@ export default function App() {
 
 
   /* ════════════════════════════════════════════════════
-     PAGE: LOTS
+     PAGE: LOTS v2
      ════════════════════════════════════════════════════ */
   const renderLots = () => {
-    const prod = products.find(p => p.id === Number(lotForm.productId));
-    const costPerUnit = lotForm.qty && lotForm.totalCost && Number(lotForm.qty) > 0
-      ? (Number(lotForm.totalCost) / Number(lotForm.qty)).toFixed(2) : null;
+    const nextLotNum = lots.length > 0
+      ? Math.max(...lots.map(l => parseInt(l.num) || 0)) + 1 : 1;
 
-    const addLot = () => {
-      if (!lotForm.productId || !lotForm.qty || !lotForm.totalCost || !lotForm.date) return;
-      const qty = Number(lotForm.qty);
-      const totalCost = Number(lotForm.totalCost);
-      const cpu = totalCost / qty;
+    const [lotDate, setLotDate] = React.useState(new Date().toISOString().slice(0,10));
+    const [lotTotalCost, setLotTotalCost] = React.useState("");
+    const [lotNote, setLotNote] = React.useState("");
+    const [lotItems, setLotItems] = React.useState([{ productId: "", qty: "", unit: "" }]);
+
+    const addLotItem = () => setLotItems(prev => [...prev, { productId: "", qty: "", unit: "" }]);
+    const removeLotItem = (i) => setLotItems(prev => prev.filter((_, idx) => idx !== i));
+    const updateLotItem = (i, field, val) => setLotItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
+
+    const validItems = lotItems.filter(i => i.productId && i.qty);
+    const canSave = lotDate && lotTotalCost && validItems.length > 0;
+
+    const saveLot = () => {
+      if (!canSave) return;
+      const totalCost = Number(lotTotalCost);
       const newLot = {
         id: "LOT-" + Date.now().toString(36).toUpperCase().slice(-6),
-        productId: Number(lotForm.productId),
-        productName: prod?.name || "",
-        qty, totalCost, costPerUnit: cpu,
-        date: lotForm.date,
-        note: lotForm.note,
+        num: nextLotNum,
+        name: `LOT #${nextLotNum}`,
+        date: lotDate,
+        note: lotNote,
+        totalCost,
+        items: validItems.map(i => ({
+          productId: Number(i.productId),
+          productName: products.find(p => p.id === Number(i.productId))?.name || "",
+          qty: Number(i.qty),
+          unit: i.unit || "ชิ้น",
+        })),
+        status: "open",
+        closedProfit: null,
         ts: Date.now(),
       };
       isEditing.current = true;
-      // 1. เพิ่ม lot
       setLots(prev => [newLot, ...prev]);
-      // 2. เพิ่มสต็อกสินค้า
-      setProducts(prev => prev.map(p => p.id === Number(lotForm.productId) ? { ...p, stock: (p.stock || 0) + qty } : p));
-      // 3. บันทึก expenses หมวด ต้นทุนสินค้า
+      // เพิ่มสต็อกแต่ละสินค้า
+      setProducts(prev => prev.map(p => {
+        const item = newLot.items.find(i => i.productId === p.id);
+        return item ? { ...p, stock: (p.stock || 0) + item.qty } : p;
+      }));
+      // บันทึก expenses
       const newExp = {
         id: "EXP-" + Date.now().toString(36).toUpperCase().slice(-6),
-        name: `ซื้อ ${prod?.name || ""} ${qty} ชิ้น (${newLot.id})`,
+        name: `${newLot.name} · ${newLot.items.map(i => i.productName).join(", ")}`,
         amount: totalCost,
-        date: lotForm.date,
+        date: lotDate,
         cat: "ต้นทุนสินค้า",
-        note: lotForm.note,
+        note: lotNote,
         ts: Date.now(),
       };
       setExpenses(prev => [newExp, ...prev]);
-      setLotForm({ productId: "", qty: "", totalCost: "", date: new Date().toISOString().slice(0,10), note: "" });
+      setLotDate(new Date().toISOString().slice(0,10));
+      setLotTotalCost("");
+      setLotNote("");
+      setLotItems([{ productId: "", qty: "", unit: "" }]);
       sfx.success();
+      setTimeout(() => { isEditing.current = false; }, 2000);
+    };
+
+    const closeLot = (lot) => {
+      const profit = calcLotRevenue(lot) - lot.totalCost;
+      isEditing.current = true;
+      setLots(prev => prev.map(l => l.id === lot.id ? { ...l, status: "closed", closedProfit: profit } : l));
       setTimeout(() => { isEditing.current = false; }, 2000);
     };
 
     const deleteLot = (lot) => {
       setConfirmModal({
-        title: "ลบล็อตสินค้า",
-        message: `ต้องการลบล็อต ${lot.id} ใช่ไหม?`,
-        details: [{ label: "สินค้า", value: lot.productName }, { label: "จำนวน", value: `${lot.qty} ชิ้น` }, { label: "ต้นทุน", value: `${lot.totalCost.toLocaleString()}฿` }],
-        warning: "สต็อกและ expenses ที่เชื่อมไว้จะถูกลบด้วย",
+        title: "ลบล็อต " + lot.name,
+        message: `ต้องการลบล็อตนี้ใช่ไหม?`,
+        details: [{ label: "สินค้า", value: lot.items.map(i => i.productName).join(", ") }, { label: "ต้นทุน", value: lot.totalCost.toLocaleString() + "฿" }],
+        warning: "สต็อกและ expenses จะถูกลบด้วย",
         onConfirm: () => {
           isEditing.current = true;
           setLots(prev => prev.filter(l => l.id !== lot.id));
-          // คืนสต็อก
-          setProducts(prev => prev.map(p => p.id === lot.productId ? { ...p, stock: Math.max(0, (p.stock || 0) - lot.qty) } : p));
-          // ลบ expenses ที่เกี่ยวข้อง
-          setExpenses(prev => prev.filter(e => !e.name.includes(lot.id)));
+          setProducts(prev => prev.map(p => {
+            const item = lot.items.find(i => i.productId === p.id);
+            return item ? { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) } : p;
+          }));
+          setExpenses(prev => prev.filter(e => !e.name.startsWith(lot.name)));
           setConfirmModal(null);
           sfx.remove();
           setTimeout(() => { isEditing.current = false; }, 2000);
@@ -2787,155 +2817,168 @@ export default function App() {
       });
     };
 
-    // คำนวณ qty ที่ขายแล้วต่อ lot
-    const soldQtyForLot = (lot) => {
-      const lotDate = new Date(lot.date).getTime();
-      const nextLotDate = lots
-        .filter(l => l.productId === lot.productId && new Date(l.date).getTime() > lotDate)
-        .sort((a, b) => new Date(a.date) - new Date(b.date))[0];
-      const cutoff = nextLotDate ? new Date(nextLotDate.date).getTime() : Infinity;
+    const calcLotRevenue = (lot) => {
+      const productIds = lot.items.map(i => i.productId);
       return orders
-        .filter(o => o.status !== "cancelled" && o.ts >= lotDate && o.ts < cutoff)
-        .reduce((s, o) => s + (o.items || []).filter(i => i.id === lot.productId).reduce((ss, i) => ss + i.qty, 0), 0);
+        .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
+        .reduce((s, o) => s + (o.items || [])
+          .filter(i => productIds.includes(i.id))
+          .reduce((ss, i) => ss + i.price * i.qty, 0), 0);
     };
 
-    const activeProducts = products.filter(p => p.active);
+    const calcLotSold = (lot) => {
+      const productIds = lot.items.map(i => i.productId);
+      return orders
+        .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
+        .reduce((s, o) => s + (o.items || [])
+          .filter(i => productIds.includes(i.id))
+          .reduce((ss, i) => ss + i.qty, 0), 0);
+    };
 
     return (
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>ล็อตสินค้า</div>
-            <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>บันทึกการซื้อสินค้าเป็นล็อต · อัปเดตสต็อกและรายจ่ายอัตโนมัติ</div>
+            <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>บันทึกการซื้อสินค้า · อัปเดตสต็อกและรายจ่ายอัตโนมัติ</div>
           </div>
         </div>
 
         {/* Form */}
         <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
             <Icon name="package" size={15} color={C.green600} /> บันทึกล็อตใหม่
+            <span style={{ fontWeight: 600, fontSize: 13, color: C.green600 }}>— {`LOT #${nextLotNum}`}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>สินค้า</label>
-              <select value={lotForm.productId} onChange={e => setLotForm(p => ({ ...p, productId: e.target.value }))} style={{ ...inp, fontSize: 13, background: C.white }}>
-                <option value="">-- เลือกสินค้า --</option>
-                {activeProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+          <div style={{ fontSize: 11, color: C.gray400, marginBottom: 16 }}>เพิ่มสต็อก + บันทึกรายจ่ายอัตโนมัติ</div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>วันที่ซื้อ</label>
-              <input type="date" value={lotForm.date} onChange={e => setLotForm(p => ({ ...p, date: e.target.value }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+              <input type="date" value={lotDate} onChange={e => setLotDate(e.target.value)} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
             </div>
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนที่ซื้อ (ชิ้น)</label>
-              <input type="number" min="1" value={lotForm.qty} onChange={e => setLotForm(p => ({ ...p, qty: e.target.value }))} placeholder="เช่น 100" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคาซื้อรวมล็อต (฿)</label>
-              <input type="number" min="0" value={lotForm.totalCost} onChange={e => setLotForm(p => ({ ...p, totalCost: e.target.value }))} placeholder="เช่น 5000" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
-            </div>
-            <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ต้นทุน/ชิ้น (อัตโนมัติ)</label>
-              <div style={{ ...inp, fontSize: 13, background: C.gray50, color: costPerUnit ? C.green600 : C.gray300, fontWeight: costPerUnit ? 700 : 400, display: "flex", alignItems: "center" }}>
-                {costPerUnit ? `${costPerUnit}฿/ชิ้น` : "กรอกจำนวนและราคา"}
-              </div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคารวมทั้งล็อต (฿)</label>
+              <input type="number" min="0" value={lotTotalCost} onChange={e => setLotTotalCost(e.target.value)} placeholder="เช่น 7250" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
             </div>
             <div>
               <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมายเหตุ (ไม่บังคับ)</label>
-              <input value={lotForm.note} onChange={e => setLotForm(p => ({ ...p, note: e.target.value }))} placeholder="เช่น ล็อตเดือนเมษา" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+              <input value={lotNote} onChange={e => setLotNote(e.target.value)} placeholder="เช่น ตลาดสี่มุมเมือง" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <BtnP onClick={addLot} disabled={!lotForm.productId || !lotForm.qty || !lotForm.totalCost}><Icon name="plus" size={14} /> บันทึกล็อต</BtnP>
-            <div style={{ fontSize: 12, color: C.gray400, display: "flex", gap: 12 }}>
-              <span><Icon name="package" size={12} color={C.gray400} /> เพิ่มสต็อกอัตโนมัติ</span>
-              <span><Icon name="creditCard" size={12} color={C.gray400} /> บันทึกรายจ่ายอัตโนมัติ</span>
+
+          <div style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 8 }}>รายการสินค้าในล็อต</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+            {/* Header */}
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 100px 100px 36px", gap: 8 }}>
+              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>สินค้า</div>
+              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>จำนวน</div>
+              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>หน่วย</div>
+              <div />
             </div>
+            {lotItems.map((item, i) => (
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 100px 100px 36px", gap: 8, alignItems: "center" }}>
+                <select value={item.productId} onChange={e => updateLotItem(i, "productId", e.target.value)} style={{ ...inp, fontSize: 13, background: C.white }}>
+                  <option value="">-- เลือกสินค้า --</option>
+                  {products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <input type="number" min="0" value={item.qty} onChange={e => updateLotItem(i, "qty", e.target.value)} placeholder="0" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                <input value={item.unit} onChange={e => updateLotItem(i, "unit", e.target.value)} placeholder="โล / ถุง / กล่อง" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                <button onClick={() => removeLotItem(i)} disabled={lotItems.length === 1} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.gray200}`, background: C.white, cursor: lotItems.length === 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: lotItems.length === 1 ? 0.3 : 1 }}>
+                  <Icon name="x" size={12} color={C.gray500} sw={2.5} />
+                </button>
+              </div>
+            ))}
+            <button onClick={addLotItem} style={{ padding: "8px 14px", borderRadius: 8, border: `1px dashed ${C.gray300}`, background: C.gray50, color: C.gray500, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textAlign: "left", fontWeight: 600 }}>
+              + เพิ่มสินค้า
+            </button>
           </div>
+
+          <BtnP onClick={saveLot} disabled={!canSave}><Icon name="save" size={14} /> บันทึก {`LOT #${nextLotNum}`}</BtnP>
         </div>
 
-        {/* Lots table */}
-        <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, overflow: "hidden" }}>
-          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.gray100}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900 }}>ประวัติล็อตทั้งหมด</div>
-            <div style={{ fontSize: 12, color: C.gray400 }}>{lots.length} ล็อต</div>
+        {/* Lots list */}
+        {lots.length === 0 ? (
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 48, textAlign: "center" }}>
+            <Icon name="package" size={28} color={C.gray200} />
+            <div style={{ marginTop: 10, fontSize: 13, color: C.gray400 }}>ยังไม่มีล็อตสินค้า</div>
           </div>
-          {lots.length === 0 ? (
-            <div style={{ padding: 48, textAlign: "center" }}>
-              <Icon name="package" size={28} color={C.gray200} />
-              <div style={{ marginTop: 10, fontSize: 13, color: C.gray400 }}>ยังไม่มีล็อตสินค้า</div>
-            </div>
-          ) : (
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: C.gray50, borderBottom: `1px solid ${C.gray200}` }}>
-                  {["สินค้า / วันที่", "ซื้อมา", "ต้นทุน/ชิ้น", "ขายแล้ว", "คงเหลือ", "รายรับล็อต", "กำไร", ""].map(h => (
-                    <th key={h} style={{ padding: "10px 16px", textAlign: h === "สินค้า / วันที่" ? "left" : "right", fontWeight: 700, color: C.gray500, fontSize: 11 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lots.map(lot => {
-                  const sold = soldQtyForLot(lot);
-                  const remaining = lot.qty - sold;
-                  const lotRevenue = orders
-                    .filter(o => o.status !== "cancelled")
-                    .reduce((s, o) => s + (o.items || []).filter(i => i.id === lot.productId).reduce((ss, i) => {
-                      const p = products.find(x => x.id === i.id);
-                      return ss + (p?.price || 0) * i.qty;
-                    }, 0), 0);
-                  const lotProfit = (sold * (products.find(p => p.id === lot.productId)?.price || 0)) - (sold * lot.costPerUnit);
-                  return (
-                    <tr key={lot.id} style={{ borderBottom: `1px solid ${C.gray100}` }}
-                      onMouseEnter={e => e.currentTarget.style.background = C.gray50}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 600, color: C.gray900 }}>{lot.productName}</div>
-                        <div style={{ fontSize: 11, color: C.gray400, marginTop: 2 }}>{lot.date ? new Date(lot.date).toLocaleDateString("th-TH") : "-"} · {lot.id}{lot.note ? ` · ${lot.note}` : ""}</div>
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right", color: C.gray600 }}>
-                        {lot.qty} ชิ้น<br /><span style={{ fontSize: 11, color: C.gray400 }}>{lot.totalCost.toLocaleString()}฿</span>
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right", color: C.gray600 }}>{lot.costPerUnit.toFixed(1)}฿</td>
-                      <td style={{ padding: "12px 16px", textAlign: "right", color: C.gray900, fontWeight: 600 }}>{sold} ชิ้น</td>
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <span style={{ color: remaining <= 5 ? C.red500 : C.gray600, fontWeight: remaining <= 5 ? 700 : 400 }}>{remaining} ชิ้น</span>
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right", color: C.gray900 }}>{(sold * (products.find(p => p.id === lot.productId)?.price || 0)).toLocaleString()}฿</td>
-                      <td style={{ padding: "12px 16px", textAlign: "right", fontWeight: 700, color: lotProfit >= 0 ? C.statusGreen600 : C.red600 }}>
-                        {lotProfit >= 0 ? "+" : ""}{Math.round(lotProfit).toLocaleString()}฿
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <button onClick={() => deleteLot(lot)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4 }}>
-                          <Icon name="trash" size={14} color={C.gray300} />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {lots.map(lot => {
+              const revenue = lot.status === "closed" ? (lot.closedRevenue || 0) : calcLotRevenue(lot);
+              const profit = lot.status === "closed" ? lot.closedProfit : revenue - lot.totalCost;
+              const sold = lot.status === "closed" ? (lot.closedSold || 0) : calcLotSold(lot);
+              const isClosed = lot.status === "closed";
+              return (
+                <div key={lot.id} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontWeight: 800, fontSize: 16, color: C.gray900 }}>{lot.name}</span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 12, background: isClosed ? C.gray100 : C.amber50, color: isClosed ? C.gray500 : C.amber600 }}>
+                          {isClosed ? "ปิดล็อตแล้ว" : "กำลังขาย"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: C.gray400, marginTop: 4 }}>
+                        {lot.date ? new Date(lot.date).toLocaleDateString("th-TH") : "-"}
+                        {lot.note ? ` · ${lot.note}` : ""}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {!isClosed && (
+                        <button onClick={() => {
+                          const rev = calcLotRevenue(lot);
+                          const sol = calcLotSold(lot);
+                          isEditing.current = true;
+                          setLots(prev => prev.map(l => l.id === lot.id ? { ...l, status: "closed", closedProfit: rev - lot.totalCost, closedRevenue: rev, closedSold: sol } : l));
+                          setTimeout(() => { isEditing.current = false; }, 2000);
+                          sfx.success();
+                        }} style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.gray300}`, background: C.white, color: C.gray600, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                          ปิดล็อต
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {/* Summary row */}
-                <tr style={{ background: C.gray50, borderTop: `2px solid ${C.gray200}` }}>
-                  <td style={{ padding: "10px 16px", fontWeight: 700, fontSize: 12, color: C.gray600 }}>รวม</td>
-                  <td style={{ padding: "10px 16px", textAlign: "right", fontSize: 12, color: C.gray600 }}>
-                    {lots.reduce((s, l) => s + l.qty, 0)} ชิ้น<br />
-                    <span style={{ fontSize: 11, color: C.gray400 }}>{lots.reduce((s, l) => s + l.totalCost, 0).toLocaleString()}฿</span>
-                  </td>
-                  <td colSpan={3} style={{ padding: "10px 16px", textAlign: "right", fontSize: 12, color: C.gray600 }}>
-                    ขายแล้ว {lots.reduce((s, l) => s + soldQtyForLot(l), 0)} ชิ้น
-                  </td>
-                  <td colSpan={2} style={{ padding: "10px 16px", textAlign: "right", fontSize: 14, fontWeight: 800, color: C.statusGreen600 }}>
-                    +{Math.round(lots.reduce((s, lot) => {
-                      const sold = soldQtyForLot(lot);
-                      return s + (sold * (products.find(p => p.id === lot.productId)?.price || 0)) - (sold * lot.costPerUnit);
-                    }, 0)).toLocaleString()}฿
-                  </td>
-                  <td />
-                </tr>
-              </tbody>
-            </table>
-          )}
-        </div>
+                      )}
+                      <button onClick={() => deleteLot(lot)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.gray200}`, background: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="trash" size={13} color={C.gray300} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* สินค้าในล็อต */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                    {lot.items.map((item, i) => (
+                      <span key={i} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, background: C.gray100, color: C.gray700 }}>
+                        {item.productName} · {item.qty} {item.unit}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* ตัวเลข */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
+                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>ซื้อมา</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: C.gray700 }}>{lot.totalCost.toLocaleString()}฿</div>
+                    </div>
+                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>ขายแล้ว</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: C.gray700 }}>{sold} ชิ้น</div>
+                    </div>
+                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>รายรับ{isClosed ? " (lock)" : ""}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: C.green600 }}>{revenue.toLocaleString()}฿</div>
+                    </div>
+                    <div style={{ background: profit >= 0 ? C.green50 : C.red50, borderRadius: 8, padding: "12px 14px" }}>
+                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>กำไร{isClosed ? " (lock)" : ""}</div>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: profit >= 0 ? C.statusGreen600 : C.red600 }}>
+                        {profit >= 0 ? "+" : ""}{Math.round(profit).toLocaleString()}฿
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
