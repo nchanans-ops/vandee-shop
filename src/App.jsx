@@ -2910,7 +2910,7 @@ export default function App() {
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   {!isClosed && <BtnO onClick={() => closeLot(lot)} style={{ padding: "6px 14px", fontSize: 12 }}>ปิดล็อต</BtnO>}
-                  <button onClick={() => deleteLot(lot)} style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.red500}`, background: C.white, color: C.red500, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
+                  <button onClick={(e) => { e.stopPropagation(); sfx.tap(); deleteLot(lot); }} style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.red500}`, background: C.white, color: C.red500, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5 }}>
                     <Icon name="trash" size={13} color={C.red500} /> ลบ
                   </button>
                 </div>
@@ -3135,7 +3135,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <div className="page-content" style={{ flex: 1, padding: "24px 28px", minWidth: 0, maxWidth: 1100, overflow: "hidden" }}>
+      <div className="page-content" style={{ flex: 1, padding: "24px 28px", minWidth: 0, maxWidth: 1100, overflow: "visible" }}>
         {page === "dashboard" && renderDashboard()}
         {page === "analytics" && renderAnalytics()}
         {page === "shop" && renderShop()}
