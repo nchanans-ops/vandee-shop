@@ -490,6 +490,7 @@ export default function App() {
   const [expCatFilter, setExpCatFilter] = useState("all");
   const [expDateFrom, setExpDateFrom] = useState("");
   const [expDateTo, setExpDateTo] = useState("");
+  const [analyticsFilter, setAnalyticsFilter] = useState("month");
 
   /* Shipping methods */
   const [shippingMethods, setShippingMethods] = useState([
@@ -2416,8 +2417,274 @@ export default function App() {
     );
   };
 
+  /* ════════════════════════════════════════════════════
+     PAGE: ANALYTICS
+     ════════════════════════════════════════════════════ */
+  const renderAnalytics = () => {
+    const now = new Date();
+    const thisYear = String(now.getFullYear());
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+
+    const filterOrders = (list) => {
+      if (analyticsFilter === "month") return list.filter(o => o.date?.slice(0,7) === thisMonth || (o.ts && new Date(o.ts).toISOString().slice(0,7) === thisMonth));
+      if (analyticsFilter === "3months") {
+        const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1);
+        return list.filter(o => o.ts && new Date(o.ts) >= cutoff);
+      }
+      if (analyticsFilter === "year") return list.filter(o => o.date?.slice(0,4) === thisYear || (o.ts && new Date(o.ts).getFullYear() === now.getFullYear()));
+      return list;
+    };
+
+    const filterExpenses = (list) => {
+      if (analyticsFilter === "month") return list.filter(e => e.date?.slice(0,7) === thisMonth);
+      if (analyticsFilter === "3months") {
+        const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().slice(0,7);
+        return list.filter(e => e.date?.slice(0,7) >= cutoff);
+      }
+      if (analyticsFilter === "year") return list.filter(e => e.date?.slice(0,4) === thisYear);
+      return list;
+    };
+
+    const filtOrders = filterOrders(orders.filter(o => o.status !== "cancelled"));
+    const filtExpenses = filterExpenses(expenses);
+
+    const totalRevenue = filtOrders.reduce((s, o) => s + (o.total || 0), 0);
+    const totalExpenses = filtExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+    const totalDiscount = filtOrders.reduce((s, o) => s + (o.discount || 0), 0);
+    const grossProfit = totalRevenue - totalExpenses;
+    const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : "0.0";
+
+    // สินค้าขายดี
+    const productSales = {};
+    filtOrders.forEach(o => {
+      (o.items || []).forEach(item => {
+        if (!productSales[item.name]) productSales[item.name] = { qty: 0, revenue: 0 };
+        productSales[item.name].qty += item.qty;
+        productSales[item.name].revenue += item.price * item.qty;
+      });
+    });
+    const topProducts = Object.entries(productSales).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
+    const maxRevenue = topProducts[0]?.[1].revenue || 1;
+
+    // รายจ่ายแยกหมวด
+    const expByCat = {};
+    filtExpenses.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
+    const expCatList = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
+    const costOfGoods = expByCat["ต้นทุนสินค้า"] || 0;
+    const otherExp = totalExpenses - costOfGoods;
+
+    // กราฟรายเดือน (6 เดือนล่าสุด)
+    const chartMonths = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      return { key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`, label: d.toLocaleDateString("th-TH", { month: "short" }) };
+    });
+    const chartRevenue = chartMonths.map(m => orders.filter(o => o.status !== "cancelled" && (o.date?.slice(0,7) === m.key || (o.ts && new Date(o.ts).toISOString().slice(0,7) === m.key))).reduce((s, o) => s + (o.total || 0), 0));
+    const chartExpenses = chartMonths.map(m => expenses.filter(e => e.date?.slice(0,7) === m.key).reduce((s, e) => s + (e.amount || 0), 0));
+    const chartProfit = chartMonths.map((_, i) => chartRevenue[i] - chartExpenses[i]);
+
+    const donutColors = ["#8B1A1A","#c44040","#e07070","#2563eb","#d97706","#6b7280"];
+
+    const filterLabels = [
+      { key: "month", label: "เดือนนี้" },
+      { key: "3months", label: "3 เดือน" },
+      { key: "year", label: "ปีนี้" },
+      { key: "all", label: "ทั้งหมด" },
+    ];
+
+    return (
+      <div data-page="analytics">
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>วิเคราะห์</div>
+            <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>รายรับ · รายจ่าย · กำไรสุทธิ</div>
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {filterLabels.map(f => (
+              <button key={f.key} onClick={() => setAnalyticsFilter(f.key)} style={{
+                padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${analyticsFilter === f.key ? C.green600 : C.gray200}`,
+                background: analyticsFilter === f.key ? C.green600 : C.white,
+                color: analyticsFilter === f.key ? C.white : C.gray600,
+                fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+              }}>{f.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
+          {[
+            { label: "รายรับ", value: `${totalRevenue.toLocaleString()}฿`, sub: `${filtOrders.length} ออเดอร์`, color: C.statusGreen600 },
+            { label: "รายจ่ายรวม", value: `${totalExpenses.toLocaleString()}฿`, sub: `${filtExpenses.length} รายการ`, color: C.red600 },
+            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: parseFloat(margin) >= 50 ? C.statusGreen600 : C.amber600 },
+            { label: "ส่วนลดที่ให้", value: `${totalDiscount.toLocaleString()}฿`, sub: `${filtOrders.filter(o => o.discount > 0).length} ออเดอร์`, color: C.amber600 },
+          ].map((k, i) => (
+            <div key={i} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
+              <div style={{ fontSize: 12, color: C.gray400, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
+              <div style={{ fontSize: 11, color: C.gray400, marginTop: 4 }}>{k.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart row */}
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 16, marginBottom: 16 }}>
+
+          {/* Bar chart */}
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 8 }}>รายรับ vs รายจ่าย vs กำไร (6 เดือนล่าสุด)</div>
+            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+              {[["#16a34a","รายรับ"],["#dc2626","รายจ่าย"],["#2563eb","กำไร"]].map(([c,l]) => (
+                <span key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.gray500 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block" }} />{l}
+                </span>
+              ))}
+            </div>
+            <div style={{ position: "relative", height: 200 }}>
+              <canvas id="analyticsBar" role="img" aria-label="กราฟแท่งรายรับ รายจ่าย กำไร 6 เดือนล่าสุด">รายรับ รายจ่าย กำไร</canvas>
+            </div>
+          </div>
+
+          {/* Donut รายจ่าย */}
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 12 }}>สัดส่วนรายจ่าย</div>
+            {expCatList.length > 0 ? <>
+              <div style={{ position: "relative", height: 150 }}>
+                <canvas id="analyticsDonut" role="img" aria-label="สัดส่วนรายจ่ายแยกหมวด">สัดส่วนรายจ่าย</canvas>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 12 }}>
+                {expCatList.slice(0,5).map(([cat, amt], i) => (
+                  <span key={cat} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.gray500 }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: donutColors[i] || C.gray300, display: "inline-block" }} />{cat}
+                    </span>
+                    <span>{totalExpenses > 0 ? Math.round(amt/totalExpenses*100) : 0}%</span>
+                  </span>
+                ))}
+              </div>
+            </> : <div style={{ padding: "40px 0", textAlign: "center", color: C.gray300, fontSize: 13 }}>ยังไม่มีรายจ่าย</div>}
+          </div>
+        </div>
+
+        {/* Bottom row */}
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16 }}>
+
+          {/* สินค้าขายดี */}
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สินค้าขายดี (รายได้)</div>
+            {topProducts.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {topProducts.map(([name, data]) => (
+                  <div key={name}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: C.gray700 }}>{name}</span>
+                      <span style={{ color: C.gray400 }}>{data.revenue.toLocaleString()}฿ · {data.qty} ชิ้น</span>
+                    </div>
+                    <div style={{ background: C.gray100, borderRadius: 4, height: 5 }}>
+                      <div style={{ background: C.green600, width: `${Math.round(data.revenue/maxRevenue*100)}%`, height: 5, borderRadius: 4 }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : <div style={{ padding: "40px 0", textAlign: "center", color: C.gray300, fontSize: 13 }}>ยังไม่มีออเดอร์</div>}
+          </div>
+
+          {/* ตารางสรุป */}
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สรุปภาพรวม</div>
+            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+              {[
+                { label: "รายรับรวม", value: `${totalRevenue.toLocaleString()}฿`, color: C.statusGreen600 },
+                { label: "ต้นทุนสินค้า", value: `-${costOfGoods.toLocaleString()}฿`, color: C.red600 },
+                { label: "ค่าใช้จ่ายอื่น", value: `-${otherExp.toLocaleString()}฿`, color: C.red600 },
+                { label: "ส่วนลดที่ให้", value: `-${totalDiscount.toLocaleString()}฿`, color: C.amber600 },
+              ].map((r, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${C.gray100}` }}>
+                  <td style={{ padding: "9px 0", color: C.gray500 }}>{r.label}</td>
+                  <td style={{ padding: "9px 0", textAlign: "right", color: r.color, fontWeight: 600 }}>{r.value}</td>
+                </tr>
+              ))}
+              <tr>
+                <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
+                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
+              </tr>
+            </table>
+            <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
+              <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Gross Margin {margin}%</div>
+              <div style={{ background: C.gray200, borderRadius: 4, height: 5, marginTop: 6 }}>
+                <div style={{ background: parseFloat(margin) >= 50 ? C.green600 : C.amber600, width: `${Math.min(parseFloat(margin),100)}%`, height: 5, borderRadius: 4 }} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chart.js script */}
+        <div id="analytics-charts-container" data-revenue={JSON.stringify(chartRevenue)} data-expenses={JSON.stringify(chartExpenses)} data-profit={JSON.stringify(chartProfit)} data-labels={JSON.stringify(chartMonths.map(m => m.label))} data-catnames={JSON.stringify(expCatList.map(c => c[0]))} data-catvals={JSON.stringify(expCatList.map(c => c[1]))} />
+      </div>
+    );
+  };
+
+  useEffect(() => {
+    if (page !== "analytics") return;
+    const container = document.getElementById("analytics-charts-container");
+    if (!container) return;
+    const revenue = JSON.parse(container.dataset.revenue || "[]");
+    const expensesData = JSON.parse(container.dataset.expenses || "[]");
+    const profit = JSON.parse(container.dataset.profit || "[]");
+    const labels = JSON.parse(container.dataset.labels || "[]");
+    const catNames = JSON.parse(container.dataset.catnames || "[]");
+    const catVals = JSON.parse(container.dataset.catvals || "[]");
+
+    const loadChartJs = () => {
+      if (window.Chart) { drawCharts(); return; }
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
+      s.onload = drawCharts;
+      document.head.appendChild(s);
+    };
+
+    const drawCharts = () => {
+      const barEl = document.getElementById("analyticsBar");
+      const donutEl = document.getElementById("analyticsDonut");
+      if (barEl) {
+        if (barEl._chartInstance) barEl._chartInstance.destroy();
+        barEl._chartInstance = new window.Chart(barEl, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              { label: "รายรับ", data: revenue, backgroundColor: "#16a34a" },
+              { label: "รายจ่าย", data: expensesData, backgroundColor: "#dc2626" },
+              { label: "กำไร", data: profit, backgroundColor: "#2563eb" },
+            ],
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+              y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+"k" : v } },
+            },
+          },
+        });
+      }
+      if (donutEl && catNames.length > 0) {
+        if (donutEl._chartInstance) donutEl._chartInstance.destroy();
+        const donutColors = ["#8B1A1A","#c44040","#e07070","#2563eb","#d97706","#6b7280"];
+        donutEl._chartInstance = new window.Chart(donutEl, {
+          type: "doughnut",
+          data: { labels: catNames, datasets: [{ data: catVals, backgroundColor: catNames.map((_, i) => donutColors[i] || "#9ca3af"), borderWidth: 0 }] },
+          options: { responsive: true, maintainAspectRatio: false, cutout: "65%", plugins: { legend: { display: false } } },
+        });
+      }
+    };
+
+    setTimeout(loadChartJs, 100);
+  }, [page, analyticsFilter, orders, expenses]);
+
   const navItems = [
     { key: "dashboard", label: "แดชบอร์ด", icon: "barChart" },
+    { key: "analytics", label: "วิเคราะห์", icon: "dollarSign" },
     { key: "shop", label: "หน้าร้าน", icon: "shoppingCart" },
     { key: "orders", label: "คำสั่งซื้อ", icon: "clipboard" },
     { key: "products", label: "จัดการสินค้า", icon: "grid" },
@@ -2607,6 +2874,7 @@ export default function App() {
       {/* Main content */}
       <div className="page-content" style={{ flex: 1, padding: "24px 28px", minWidth: 0, maxWidth: 1100, overflow: "hidden" }}>
         {page === "dashboard" && renderDashboard()}
+        {page === "analytics" && renderAnalytics()}
         {page === "shop" && renderShop()}
         {page === "orders" && renderOrders()}
         {page === "products" && renderProducts()}
