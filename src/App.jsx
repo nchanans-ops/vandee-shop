@@ -2788,13 +2788,13 @@ export default function App() {
       setConfirmModal({
         title: "ลบ " + lot.name,
         message: "ต้องการลบล็อตนี้ใช่ไหม?",
-        details: [{ label: "สินค้า", value: lot.items.map(i => i.productName).join(", ") }, { label: "ต้นทุน", value: lot.totalCost.toLocaleString() + "฿" }],
+        details: [{ label: "สินค้า", value: (lot.items || []).map(i => i.productName).join(", ") || lot.productName || "-" }, { label: "ต้นทุน", value: lot.totalCost.toLocaleString() + "฿" }],
         warning: "สต็อกและ expenses จะถูกลบด้วย",
         onConfirm: () => {
           isEditing.current = true;
           setLots(prev => prev.filter(l => l.id !== lot.id));
           setProducts(prev => prev.map(p => {
-            const item = lot.items.find(i => i.productId === p.id);
+            const item = (lot.items || []).find(i => i.productId === p.id);
             return item ? { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) } : p;
           }));
           setExpenses(prev => prev.filter(e => !e.name.startsWith(lot.name)));
@@ -2808,13 +2808,13 @@ export default function App() {
     const calcRevenue = (lot) => orders
       .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
       .reduce((s, o) => s + (o.items || [])
-        .filter(i => lot.items.some(li => li.productId === i.id))
+        .filter(i => (lot.items || []).some(li => li.productId === i.id))
         .reduce((ss, i) => ss + i.price * i.qty, 0), 0);
 
     const calcSold = (lot) => orders
       .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
       .reduce((s, o) => s + (o.items || [])
-        .filter(i => lot.items.some(li => li.productId === i.id))
+        .filter(i => (lot.items || []).some(li => li.productId === i.id))
         .reduce((ss, i) => ss + i.qty, 0), 0);
 
     const closeLot = (lot) => {
