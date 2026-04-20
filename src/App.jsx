@@ -1228,14 +1228,14 @@ export default function App() {
      PAGE: PRODUCT MANAGEMENT
      ════════════════════════════════════════════════════ */
   const [editProduct, setEditProduct] = useState(null); // null | "new" | product object
-  const [prodForm, setProdForm] = useState({ name: "", desc: "", price: "", cat: "snack", img: "", stock: "" });
+  const [prodForm, setProdForm] = useState({ name: "", desc: "", price: "", cost: "", cat: "snack", img: "", stock: "" });
 
-  const startAdd = () => { setProdForm({ name: "", desc: "", price: "", cat: "snack", img: "", stock: "" }); setEditProduct("new"); };
-  const startEdit = (p) => { setProdForm({ name: p.name, desc: p.desc, price: String(p.price), cat: p.cat, img: p.img, stock: String(p.stock ?? 0) }); setEditProduct(p); };
+  const startAdd = () => { setProdForm({ name: "", desc: "", price: "", cost: "", cat: "snack", img: "", stock: "" }); setEditProduct("new"); };
+  const startEdit = (p) => { setProdForm({ name: p.name, desc: p.desc, price: String(p.price), cost: String(p.cost ?? ""), cat: p.cat, img: p.img, stock: String(p.stock ?? 0) }); setEditProduct(p); };
   const cancelEdit = () => setEditProduct(null);
   const saveProduct = () => {
     isEditing.current = true;
-    const data = { name: prodForm.name, desc: prodForm.desc, price: Number(prodForm.price), cat: prodForm.cat, img: prodForm.img || "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=300&fit=crop", active: true, stock: Number(prodForm.stock) || 0 };
+    const data = { name: prodForm.name, desc: prodForm.desc, price: Number(prodForm.price), cost: Number(prodForm.cost) || 0, cat: prodForm.cat, img: prodForm.img || "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=400&h=300&fit=crop", active: true, stock: Number(prodForm.stock) || 0 };
     if (editProduct === "new") {
       setProducts(prev => [...prev, { ...data, id: nextId }]);
       setNextId(n => n + 1);
@@ -1274,7 +1274,22 @@ export default function App() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ชื่อสินค้า</label><input value={prodForm.name} onChange={e => setProdForm(p => ({ ...p, name: e.target.value }))} placeholder="เช่น Espresso" style={inp} onFocus={focus} onBlur={blur} /></div>
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคา (บาท)</label><input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคาขาย (฿)</label>
+              <input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                ต้นทุน/ชิ้น (฿)
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: C.green50, color: C.green700 }}>ใช้คำนวณกำไร</span>
+              </label>
+              <input type="number" value={prodForm.cost} onChange={e => setProdForm(p => ({ ...p, cost: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
+              {prodForm.price && prodForm.cost && Number(prodForm.price) > 0 && (
+                <div style={{ marginTop: 5, fontSize: 11, color: C.green600, fontWeight: 600 }}>
+                  margin {((Number(prodForm.price) - Number(prodForm.cost)) / Number(prodForm.price) * 100).toFixed(1)}% · กำไร {(Number(prodForm.price) - Number(prodForm.cost)).toLocaleString()}฿/ชิ้น
+                </div>
+              )}
+            </div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนสต็อก (ชิ้น)</label><input type="number" value={prodForm.stock} onChange={e => setProdForm(p => ({ ...p, stock: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รายละเอียด</label><input value={prodForm.desc} onChange={e => setProdForm(p => ({ ...p, desc: e.target.value }))} placeholder="คำอธิบายสั้น ๆ" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมวดหมู่</label><select value={prodForm.cat} onChange={e => setProdForm(p => ({ ...p, cat: e.target.value }))} style={{ ...inp, cursor: "pointer" }}>{categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
@@ -1292,7 +1307,7 @@ export default function App() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: C.gray50, borderBottom: `1px solid ${C.gray200}` }}>
-              {["สินค้า", "หมวดหมู่", "ราคา", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
+              {["สินค้า", "หมวดหมู่", "ราคาขาย", "ต้นทุน", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -1308,6 +1323,7 @@ export default function App() {
                   </td>
                   <td style={{ padding: "10px 16px", color: C.gray500 }}>{catLabel}</td>
                   <td style={{ padding: "10px 16px", fontWeight: 700, color: C.green600 }}>{p.price}฿</td>
+                  <td style={{ padding: "10px 16px", color: p.cost ? C.gray600 : C.gray300, fontSize: 13 }}>{p.cost ? `${p.cost}฿` : "-"}</td>
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{ fontWeight: 700, color: (p.stock ?? 0) <= 5 ? C.red500 : (p.stock ?? 0) <= 20 ? C.amber600 : C.gray700 }}>{p.stock ?? 0}</span>
                     <span style={{ fontSize: 11, color: C.gray400, marginLeft: 3 }}>ชิ้น</span>
@@ -2451,7 +2467,7 @@ export default function App() {
     const totalRevenue = filtOrders.reduce((s, o) => s + (o.total || 0), 0);
     const totalExpenses = filtExpenses.reduce((s, e) => s + (e.amount || 0), 0);
     const totalDiscount = filtOrders.reduce((s, o) => s + (o.discount || 0), 0);
-    const grossProfit = totalRevenue - totalExpenses;
+    const grossProfit = totalRevenue - cogs - totalExpenses - totalDiscount;
     const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : "0.0";
 
     // สินค้าขายดี
@@ -2470,8 +2486,15 @@ export default function App() {
     const expByCat = {};
     filtExpenses.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
     const expCatList = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
-    const costOfGoods = expByCat["ต้นทุนสินค้า"] || 0;
-    const otherExp = totalExpenses - costOfGoods;
+    // COGS คำนวณจาก cost × qty ที่ขายจริง
+    const cogs = filtOrders.reduce((sum, o) => {
+      return sum + (o.items || []).reduce((s, item) => {
+        const prod = products.find(p => p.id === item.id);
+        return s + (prod?.cost || 0) * item.qty;
+      }, 0);
+    }, 0);
+    const costOfGoods = cogs;
+    const otherExp = totalExpenses;
 
     // กราฟรายเดือน (6 เดือนล่าสุด)
     const chartMonths = Array.from({ length: 6 }, (_, i) => {
