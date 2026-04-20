@@ -180,7 +180,7 @@ function downloadCSV(filename, headers, rows) {
 }
 
 function exportOrdersCSV(orders, filename) {
-  const headers = ["หมายเลขออเดอร์", "วันที่", "สถานะ", "ชื่อผู้รับ", "โทรศัพท์", "ที่อยู่", "จังหวัด", "รหัสไปรษณีย์", "วิธีจัดส่ง", "รายการสินค้า", "จำนวนชิ้นรวม", "ค่าสินค้า", "ค่าส่ง", "ยอดรวม"];
+  const headers = ["หมายเลขออเดอร์", "วันที่", "สถานะ", "ชื่อผู้รับ", "โทรศัพท์", "ที่อยู่", "จังหวัด", "รหัสไปรษณีย์", "วิธีจัดส่ง", "รายการสินค้า", "จำนวนชิ้นรวม", "ค่าสินค้า", "ส่วนลด (฿)", "ส่วนลด (%)", "ค่าส่ง", "ยอดรวม"];
   const rows = orders.map(o => [
     o.id, o.date,
     ({ pending: "รอตรวจสอบ", shipped: "จัดส่งแล้ว", completed: "สำเร็จ", cancelled: "ยกเลิก" })[o.status] || o.status,
@@ -190,13 +190,13 @@ function exportOrdersCSV(orders, filename) {
     o.shippingLabel || "-",
     o.items?.map(i => `${i.name} x${i.qty}`).join("; "),
     o.items?.reduce((s, i) => s + i.qty, 0),
-    o.subtotal, o.shipping, o.total,
+    o.subtotal, o.discount || 0, o.discountPct || 0, o.shipping, o.total,
   ]);
   downloadCSV(filename, headers, rows);
 }
 
 function exportOrdersExcel(orders, filename) {
-  const headers = ["หมายเลขออเดอร์", "วันที่", "สถานะ", "ชื่อผู้รับ", "โทรศัพท์", "ที่อยู่", "จังหวัด", "รหัสไปรษณีย์", "วิธีจัดส่ง", "รายการสินค้า", "จำนวนชิ้นรวม", "ค่าสินค้า", "ค่าส่ง", "ยอดรวม"];
+  const headers = ["หมายเลขออเดอร์", "วันที่", "สถานะ", "ชื่อผู้รับ", "โทรศัพท์", "ที่อยู่", "จังหวัด", "รหัสไปรษณีย์", "วิธีจัดส่ง", "รายการสินค้า", "จำนวนชิ้นรวม", "ค่าสินค้า", "ส่วนลด (฿)", "ส่วนลด (%)", "ค่าส่ง", "ยอดรวม"];
   const statusTh = { pending: "รอตรวจสอบ", shipped: "จัดส่งแล้ว", completed: "สำเร็จ", cancelled: "ยกเลิก" };
   const rows = orders.map(o => [
     o.id, o.date, statusTh[o.status] || o.status,
@@ -206,7 +206,7 @@ function exportOrdersExcel(orders, filename) {
     o.shippingLabel || "-",
     o.items?.map(i => `${i.name} x${i.qty}`).join("; ") || "",
     o.items?.reduce((s, i) => s + i.qty, 0) || 0,
-    o.subtotal || 0, o.shipping || 0, o.total || 0,
+    o.subtotal || 0, o.discount || 0, o.discountPct || 0, o.shipping || 0, o.total || 0,
   ]);
 
   // Build XML Spreadsheet (opens in Excel natively)
@@ -291,6 +291,8 @@ async function syncOrderToSheet(url, order) {
         items: order.items?.map(i => `${i.name} x${i.qty}`).join(", ") || "",
         totalItems: order.items?.reduce((s, i) => s + i.qty, 0) || 0,
         subtotal: order.subtotal || 0,
+        discount: order.discount || 0,
+        discountPct: order.discountPct || 0,
         shippingCost: order.shipping || 0,
         total: order.total || 0,
         slipData: order.slipData || "",
@@ -312,7 +314,7 @@ async function syncAllOrdersToSheet(url, orders) {
       note: o.address?.note || "", shippingMethod: o.shippingLabel || "-",
       items: o.items?.map(i => `${i.name} x${i.qty}`).join(", ") || "",
       totalItems: o.items?.reduce((s, i) => s + i.qty, 0) || 0,
-      subtotal: o.subtotal || 0, shippingCost: o.shipping || 0, total: o.total || 0,
+      subtotal: o.subtotal || 0, discount: o.discount || 0, discountPct: o.discountPct || 0, shippingCost: o.shipping || 0, total: o.total || 0,
     }));
     await fetch(url, { method: "POST", mode: "no-cors", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "syncAll", orders: rows }) });
     return { ok: true };
@@ -491,6 +493,8 @@ export default function App() {
   /* Shop state */
   const [step, setStep] = useState(STEPS.MENU);
   const [cart, setCart] = useState([]);
+  const [discount, setDiscount] = useState(0);
+  const [discountInput, setDiscountInput] = useState("");
   const [activeCat, setActiveCat] = useState("all");
   const [search, setSearch] = useState("");
   const [address, setAddress] = useState({ name: "", phone: "", addr: "", district: "", amphoe: "", province: "", zip: "", note: "" });
@@ -611,7 +615,9 @@ export default function App() {
   const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const shippingMethod = shippingMethods.find(m => m.id === selectedShipping) || shippingMethods[0];
   const shipping = shippingMethod?.price || 0;
-  const total = subtotal + shipping;
+  const discountAmt = Math.min(Math.max(0, discount), subtotal);
+  const discountPct = subtotal > 0 ? ((discountAmt / subtotal) * 100).toFixed(1) : "0.0";
+  const total = subtotal - discountAmt + shipping;
   const activeProducts = products.filter(p => p.active);
   const filtered = activeProducts.filter(p => (activeCat === "all" || p.cat === activeCat) && (!search || p.name.toLowerCase().includes(search.toLowerCase()) || p.desc.includes(search)));
   const addressValid = address.name && address.phone && address.addr && address.province && address.zip;
@@ -626,7 +632,7 @@ export default function App() {
       status: "pending",
       address: { ...address, district: `${address.district || ""} ${address.amphoe || ""}`.trim() },
       items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
-      subtotal, shipping, total,
+      subtotal, discount: discountAmt, discountPct: parseFloat(discountPct), shipping, total,
       shippingLabel: shippingMethod?.label || "-",
       slipName: slipFile?.name || "slip.jpg",
       slipData: slipPreview || "",
@@ -648,7 +654,7 @@ export default function App() {
     syncOrder(newOrder);
   };
 
-  const resetShop = () => { setCart([]); setAddress({ name: "", phone: "", addr: "", district: "", amphoe: "", province: "", zip: "", note: "" }); setSlipFile(null); setSlipPreview(null); setConfirmed(false); setSelectedShipping("standard"); setStep(STEPS.MENU); };
+  const resetShop = () => { setCart([]); setDiscount(0); setDiscountInput(""); setAddress({ name: "", phone: "", addr: "", district: "", amphoe: "", province: "", zip: "", note: "" }); setSlipFile(null); setSlipPreview(null); setConfirmed(false); setSelectedShipping("standard"); setStep(STEPS.MENU); };
 
   const statusMap = { pending: { label: "รอตรวจสอบ", bg: C.amber100, color: C.amber700 }, shipped: { label: "จัดส่งแล้ว", bg: C.blue50, color: C.blue600 }, completed: { label: "สำเร็จ", bg: C.statusGreen100, color: C.statusGreen700 }, cancelled: { label: "ยกเลิก", bg: C.red50, color: C.red600 } };
 
@@ -847,7 +853,7 @@ export default function App() {
                 <Section icon="mapPin" title="ข้อมูลผู้รับสินค้า"><div style={{ display: "grid", gridTemplateColumns: "100px 1fr", gap: "8px 16px", fontSize: 13 }}><span style={{ color: C.gray400, fontWeight: 600 }}>ชื่อผู้รับ</span><span style={{ fontWeight: 700 }}>{address.name}</span><span style={{ color: C.gray400, fontWeight: 600 }}>โทรศัพท์</span><span style={{ fontWeight: 700 }}>{address.phone}</span><span style={{ color: C.gray400, fontWeight: 600 }}>ที่อยู่</span><span>{address.addr} {address.district} {address.amphoe} {address.province} {address.zip}</span>{address.note && <><span style={{ color: C.gray400, fontWeight: 600 }}>หมายเหตุ</span><span>{address.note}</span></>}</div></Section>
                 <Section icon="package" title={`รายการสินค้า (${totalItems} ชิ้น)`}>
                   {cart.map((item, i) => <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: i < cart.length - 1 ? `1px solid ${C.gray100}` : "none" }}><Img product={item} style={{ width: 44, height: 44, borderRadius: 8, flexShrink: 0 }} imgErr={imgErr} setImgErr={setImgErr} /><div style={{ flex: 1 }}><div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div><div style={{ fontSize: 12, color: C.gray400 }}>{item.price}฿ x {item.qty} ชิ้น</div></div><div style={{ fontWeight: 700, fontSize: 15, color: C.green600 }}>{(item.price * item.qty).toLocaleString()}฿</div></div>)}
-                  <div style={{ borderTop: `2px solid ${C.gray100}`, marginTop: 8, paddingTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: "6px 20px", fontSize: 13 }}><span style={{ color: C.gray500 }}>ค่าสินค้ารวม</span><span style={{ textAlign: "right", fontWeight: 600 }}>{subtotal.toLocaleString()}฿</span><span style={{ color: C.gray500 }}>ค่าจัดส่ง ({shippingMethod?.label})</span><span style={{ textAlign: "right", fontWeight: 600 }}>{shipping === 0 ? "ฟรี" : `${shipping}฿`}</span><span style={{ fontWeight: 800, fontSize: 16, paddingTop: 8, borderTop: `1px solid ${C.gray200}` }}>ยอดรวมทั้งหมด</span><span style={{ fontWeight: 800, fontSize: 20, color: C.green600, textAlign: "right", paddingTop: 8, borderTop: `1px solid ${C.gray200}` }}>{total.toLocaleString()}฿</span></div>
+                  <div style={{ borderTop: `2px solid ${C.gray100}`, marginTop: 8, paddingTop: 10, display: "grid", gridTemplateColumns: "1fr auto", gap: "6px 20px", fontSize: 13 }}><span style={{ color: C.gray500 }}>ค่าสินค้ารวม</span><span style={{ textAlign: "right", fontWeight: 600 }}>{subtotal.toLocaleString()}฿</span>{discountAmt > 0 && <><span style={{ color: C.red500, fontWeight: 600 }}>ส่วนลด ({discountPct}%)</span><span style={{ textAlign: "right", fontWeight: 700, color: C.red500 }}>-{discountAmt.toLocaleString()}฿</span></>}<span style={{ color: C.gray500 }}>ค่าจัดส่ง ({shippingMethod?.label})</span><span style={{ textAlign: "right", fontWeight: 600 }}>{shipping === 0 ? "ฟรี" : `${shipping}฿`}</span><span style={{ fontWeight: 800, fontSize: 16, paddingTop: 8, borderTop: `1px solid ${C.gray200}` }}>ยอดรวมทั้งหมด</span><span style={{ fontWeight: 800, fontSize: 20, color: C.green600, textAlign: "right", paddingTop: 8, borderTop: `1px solid ${C.gray200}` }}>{total.toLocaleString()}฿</span></div>
                 </Section>
                 <Section icon="creditCard" title="หลักฐานการโอนเงิน">{slipPreview && <img src={slipPreview} alt="slip" style={{ width: "100%", maxHeight: 250, objectFit: "contain", borderRadius: 8, background: C.gray50 }} />}</Section>
                 <div style={{ display: "flex", gap: 10 }}><BtnO onClick={() => setStep(STEPS.SLIP)}><Icon name="arrowLeft" size={15} /> แก้ไข</BtnO><BtnP onClick={confirmOrder} style={{ flex: 1, padding: "13px 20px", fontSize: 15, fontWeight: 700 }}><Icon name="check" size={16} /> ยืนยันสั่งซื้อ</BtnP></div>
@@ -868,6 +874,24 @@ export default function App() {
               </div>
               <div style={{ padding: "14px 20px", borderTop: `1px solid ${C.gray100}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.gray500, marginBottom: 3 }}><span>ค่าสินค้า</span><span>{subtotal.toLocaleString()}฿</span></div>
+                {/* Discount input */}
+                <div style={{ marginBottom: 8, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span>ส่วนลด</span>
+                    {discountAmt > 0 && <span style={{ color: C.green600, fontWeight: 700 }}>-{discountPct}%</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <input
+                      type="number" min="0" placeholder="0"
+                      value={discountInput}
+                      onChange={e => { const v = e.target.value; setDiscountInput(v); setDiscount(parseFloat(v) || 0); }}
+                      style={{ ...inp, padding: "7px 10px", fontSize: 13, flex: 1 }}
+                      onFocus={focus} onBlur={blur}
+                    />
+                    <span style={{ display: "flex", alignItems: "center", fontSize: 13, color: C.gray500, fontWeight: 600, paddingRight: 4 }}>฿</span>
+                  </div>
+                  {discountAmt > 0 && <div style={{ fontSize: 11, color: C.red500, fontWeight: 600, marginTop: 3 }}>-{discountAmt.toLocaleString()}฿ ({discountPct}%)</div>}
+                </div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.gray500, marginBottom: 3 }}><span>ค่าจัดส่ง <span style={{ fontSize: 11, color: C.gray400 }}>({shippingMethod?.label})</span></span><span>{shipping === 0 ? <span style={{ color: C.green600, fontWeight: 600 }}>ฟรี</span> : `${shipping}฿`}</span></div>
                 <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: 16, paddingTop: 10, borderTop: `2px solid ${C.gray100}` }}><span>รวม</span><span style={{ color: C.green600 }}>{total.toLocaleString()}฿</span></div>
                 {step === STEPS.MENU && <BtnP onClick={() => setStep(STEPS.ADDRESS)} disabled={cart.length === 0} style={{ width: "100%", marginTop: 12 }}>ดำเนินการสั่งซื้อ <Icon name="arrowRight" size={15} /></BtnP>}
@@ -976,6 +1000,12 @@ export default function App() {
                         </div>
                       ))}
                       <div style={{ borderTop: `2px solid ${C.gray100}`, marginTop: 6, paddingTop: 6, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: C.gray500 }}>ค่าสินค้า</span><span style={{ fontWeight: 600 }}>{(o.subtotal || 0).toLocaleString()}฿</span>
+                      </div>
+                      {o.discount > 0 && <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 3 }}>
+                        <span style={{ color: C.red500, fontWeight: 600 }}>ส่วนลด ({o.discountPct || 0}%)</span><span style={{ fontWeight: 700, color: C.red500 }}>-{(o.discount || 0).toLocaleString()}฿</span>
+                      </div>}
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginTop: 3 }}>
                         <span style={{ color: C.gray500 }}>ค่าส่ง ({o.shippingLabel || "จัดส่งทั่วไป"})</span><span style={{ fontWeight: 600 }}>{o.shipping === 0 ? "ฟรี" : `${o.shipping}฿`}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 15, fontWeight: 800, marginTop: 6 }}>
@@ -1745,6 +1775,7 @@ export default function App() {
     (order.items || []).forEach(i => lines.push({ type: "row", size: fs, left: `${i.name} x${i.qty}`, right: `${(i.price * i.qty).toLocaleString()}฿` }));
     lines.push({ type: "line" });
     lines.push({ type: "row", size: fsS, left: "ค่าสินค้า", right: `${(order.subtotal || 0).toLocaleString()}฿`, color: "#666" });
+    if (order.discount > 0) lines.push({ type: "row", size: fsS, left: `ส่วนลด (${order.discountPct || 0}%)`, right: `-${(order.discount || 0).toLocaleString()}฿`, color: "#dc2626" });
     lines.push({ type: "row", size: fsS, left: `ค่าส่ง (${order.shippingLabel || "-"})`, right: order.shipping === 0 ? "ฟรี" : `${order.shipping}฿`, color: "#666" });
     lines.push({ type: "dash" });
     lines.push({ type: "row", size: fsL, left: "รวม", right: `${(order.total || 0).toLocaleString()}฿`, bold: true });
