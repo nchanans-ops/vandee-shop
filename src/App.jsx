@@ -2684,13 +2684,13 @@ export default function App() {
 
   const navItems = [
     { key: "dashboard", label: "แดชบอร์ด", icon: "barChart" },
-    { key: "analytics", label: "วิเคราะห์", icon: "dollarSign" },
     { key: "shop", label: "หน้าร้าน", icon: "shoppingCart" },
     { key: "orders", label: "คำสั่งซื้อ", icon: "clipboard" },
+    { key: "analytics", label: "วิเคราะห์", icon: "dollarSign" },
+    { key: "expenses", label: "รายจ่าย", icon: "creditCard" },
     { key: "products", label: "จัดการสินค้า", icon: "grid" },
     { key: "categories", label: "จัดการหมวดหมู่", icon: "list" },
     { key: "shipping", label: "วิธีจัดส่ง", icon: "truck" },
-    { key: "expenses", label: "รายจ่าย", icon: "creditCard" },
     { key: "print", label: "พิมพ์ที่อยู่", icon: "printer" },
     { key: "settings", label: "ตั้งค่า", icon: "save" },
   ];
