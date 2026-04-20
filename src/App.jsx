@@ -488,6 +488,8 @@ export default function App() {
   const [newExpCat, setNewExpCat] = useState("");
   const [expFilter, setExpFilter] = useState("month");
   const [expCatFilter, setExpCatFilter] = useState("all");
+  const [expDateFrom, setExpDateFrom] = useState("");
+  const [expDateTo, setExpDateTo] = useState("");
 
   /* Shipping methods */
   const [shippingMethods, setShippingMethods] = useState([
@@ -2100,6 +2102,14 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
         const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().slice(0,7);
         return list.filter(e => e.date?.slice(0,7) >= cutoff);
       }
+      if (expFilter === "custom") {
+        return list.filter(e => {
+          if (!e.date) return false;
+          if (expDateFrom && e.date < expDateFrom) return false;
+          if (expDateTo && e.date > expDateTo) return false;
+          return true;
+        });
+      }
       return list;
     };
 
@@ -2295,7 +2305,15 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
                 <option value="lastmonth">เดือนที่แล้ว</option>
                 <option value="3months">3 เดือนล่าสุด</option>
                 <option value="all">ทั้งหมด</option>
+                <option value="custom">เลือกวันที่</option>
               </select>
+              {expFilter === "custom" && (
+                <>
+                  <input type="date" value={expDateFrom} onChange={e => setExpDateFrom(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
+                  <span style={{ fontSize: 12, color: C.gray400 }}>ถึง</span>
+                  <input type="date" value={expDateTo} onChange={e => setExpDateTo(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
+                </>
+              )}
               <select value={expCatFilter} onChange={e => setExpCatFilter(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }}>
                 <option value="all">ทุกหมวดหมู่</option>
                 {expenseCats.map(c => <option key={c} value={c}>{c}</option>)}
