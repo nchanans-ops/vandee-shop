@@ -2516,7 +2516,7 @@ export default function App() {
           {[
             { label: "รายรับ", value: `${totalRevenue.toLocaleString()}฿`, sub: `${filtOrders.length} ออเดอร์`, color: C.green600 },
             { label: "รายจ่ายรวม", value: `${totalExpenses.toLocaleString()}฿`, sub: `${filtExpenses.length} รายการ`, color: C.gray600 },
-            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: C.green700 },
+            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: C.statusGreen600 },
             { label: "ส่วนลดที่ให้", value: `${totalDiscount.toLocaleString()}฿`, sub: `${filtOrders.filter(o => o.discount > 0).length} ออเดอร์`, color: C.amber600 },
           ].map((k, i) => (
             <div key={i} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
@@ -2606,7 +2606,7 @@ export default function App() {
               ))}
               <tr>
                 <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
-                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.green600 : C.gray700 }}>{grossProfit.toLocaleString()}฿</td>
+                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
               </tr>
             </table>
             <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
