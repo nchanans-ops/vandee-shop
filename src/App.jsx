@@ -2616,53 +2616,26 @@ export default function App() {
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สรุปภาพรวม</div>
             <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
-              <tbody>
-              {/* รายรับ */}
-              <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                <td style={{ padding: "9px 0", color: C.gray500 }}>รายรับรวม</td>
-                <td style={{ padding: "9px 0", textAlign: "right", color: C.green600, fontWeight: 600 }}>{totalRevenue.toLocaleString()}฿</td>
-              </tr>
-              {/* COGS */}
-              <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                <td style={{ padding: "9px 0", color: C.gray500 }}>ต้นทุนสินค้า (COGS)</td>
-                <td style={{ padding: "9px 0", textAlign: "right", color: C.gray600, fontWeight: 600 }}>-{cogs.toLocaleString()}฿</td>
-              </tr>
-              {/* expenses แยกหมวด */}
-              {expCatList.map(([cat, amt]) => (
-                <tr key={cat} style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "8px 0 8px 12px", color: C.gray400, fontSize: 12 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.gray300, display: "inline-block" }} />
-                      {cat}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 0", textAlign: "right", color: C.gray500, fontSize: 12 }}>-{amt.toLocaleString()}฿</td>
+              {[
+                { label: "รายรับรวม", value: `${totalRevenue.toLocaleString()}฿`, color: C.green600 },
+                { label: "ต้นทุนสินค้า", value: `-${costOfGoods.toLocaleString()}฿`, color: C.gray600 },
+                { label: "ค่าใช้จ่ายอื่น", value: `-${otherExp.toLocaleString()}฿`, color: C.gray600 },
+                { label: "ส่วนลดที่ให้", value: `-${totalDiscount.toLocaleString()}฿`, color: C.amber600 },
+              ].map((r, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${C.gray100}` }}>
+                  <td style={{ padding: "9px 0", color: C.gray500 }}>{r.label}</td>
+                  <td style={{ padding: "9px 0", textAlign: "right", color: r.color, fontWeight: 600 }}>{r.value}</td>
                 </tr>
               ))}
-              {expCatList.length === 0 && (
-                <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "8px 0 8px 12px", color: C.gray300, fontSize: 12 }}>ยังไม่มีรายจ่าย</td>
-                  <td style={{ padding: "8px 0", textAlign: "right", color: C.gray300, fontSize: 12 }}>-0฿</td>
-                </tr>
-              )}
-              {/* ส่วนลด */}
-              {totalDiscount > 0 && (
-                <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "9px 0", color: C.gray500 }}>ส่วนลดที่ให้</td>
-                  <td style={{ padding: "9px 0", textAlign: "right", color: C.amber600, fontWeight: 600 }}>-{totalDiscount.toLocaleString()}฿</td>
-                </tr>
-              )}
-              {/* กำไรสุทธิ */}
               <tr>
                 <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
                 <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
               </tr>
-              </tbody>
             </table>
             <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Net Margin {margin}%</div>
+              <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Gross Margin {margin}%</div>
               <div style={{ background: C.gray200, borderRadius: 4, height: 5, marginTop: 6 }}>
-                <div style={{ background: C.green600, width: `${Math.min(Math.max(parseFloat(margin),0),100)}%`, height: 5, borderRadius: 4 }} />
+                <div style={{ background: C.green600, width: `${Math.min(parseFloat(margin),100)}%`, height: 5, borderRadius: 4 }} />
               </div>
             </div>
           </div>
