@@ -493,7 +493,10 @@ export default function App() {
 
   /* Lots state */
   const [lots, setLots] = useState([]);
-  const [lotForm, setLotForm] = useState({ productId: "", qty: "", totalCost: "", date: new Date().toISOString().slice(0,10), note: "" });
+  const [lotDate, setLotDate] = useState(new Date().toISOString().slice(0,10));
+  const [lotTotalCost, setLotTotalCost] = useState("");
+  const [lotNote, setLotNote] = useState("");
+  const [lotItems, setLotItems] = useState([{ productId: "", qty: "", unit: "" }]);
   const [analyticsFilter, setAnalyticsFilter] = useState("month");
 
   /* Shipping methods */
@@ -2725,21 +2728,13 @@ export default function App() {
 
 
   /* ════════════════════════════════════════════════════
-     PAGE: LOTS v2
+     PAGE: LOTS v3
      ════════════════════════════════════════════════════ */
   const renderLots = () => {
-    const nextLotNum = lots.length > 0
-      ? Math.max(...lots.map(l => parseInt(l.num) || 0)) + 1 : 1;
-
-    const [lotDate, setLotDate] = React.useState(new Date().toISOString().slice(0,10));
-    const [lotTotalCost, setLotTotalCost] = React.useState("");
-    const [lotNote, setLotNote] = React.useState("");
-    const [lotItems, setLotItems] = React.useState([{ productId: "", qty: "", unit: "" }]);
-
+    const nextLotNum = lots.length > 0 ? Math.max(...lots.map(l => l.num || 0)) + 1 : 1;
     const addLotItem = () => setLotItems(prev => [...prev, { productId: "", qty: "", unit: "" }]);
     const removeLotItem = (i) => setLotItems(prev => prev.filter((_, idx) => idx !== i));
     const updateLotItem = (i, field, val) => setLotItems(prev => prev.map((item, idx) => idx === i ? { ...item, [field]: val } : item));
-
     const validItems = lotItems.filter(i => i.productId && i.qty);
     const canSave = lotDate && lotTotalCost && validItems.length > 0;
 
@@ -2761,16 +2756,16 @@ export default function App() {
         })),
         status: "open",
         closedProfit: null,
+        closedRevenue: null,
+        closedSold: null,
         ts: Date.now(),
       };
       isEditing.current = true;
       setLots(prev => [newLot, ...prev]);
-      // เพิ่มสต็อกแต่ละสินค้า
       setProducts(prev => prev.map(p => {
         const item = newLot.items.find(i => i.productId === p.id);
         return item ? { ...p, stock: (p.stock || 0) + item.qty } : p;
       }));
-      // บันทึก expenses
       const newExp = {
         id: "EXP-" + Date.now().toString(36).toUpperCase().slice(-6),
         name: `${newLot.name} · ${newLot.items.map(i => i.productName).join(", ")}`,
@@ -2789,17 +2784,10 @@ export default function App() {
       setTimeout(() => { isEditing.current = false; }, 2000);
     };
 
-    const closeLot = (lot) => {
-      const profit = calcLotRevenue(lot) - lot.totalCost;
-      isEditing.current = true;
-      setLots(prev => prev.map(l => l.id === lot.id ? { ...l, status: "closed", closedProfit: profit } : l));
-      setTimeout(() => { isEditing.current = false; }, 2000);
-    };
-
     const deleteLot = (lot) => {
       setConfirmModal({
-        title: "ลบล็อต " + lot.name,
-        message: `ต้องการลบล็อตนี้ใช่ไหม?`,
+        title: "ลบ " + lot.name,
+        message: "ต้องการลบล็อตนี้ใช่ไหม?",
         details: [{ label: "สินค้า", value: lot.items.map(i => i.productName).join(", ") }, { label: "ต้นทุน", value: lot.totalCost.toLocaleString() + "฿" }],
         warning: "สต็อกและ expenses จะถูกลบด้วย",
         onConfirm: () => {
@@ -2817,40 +2805,40 @@ export default function App() {
       });
     };
 
-    const calcLotRevenue = (lot) => {
-      const productIds = lot.items.map(i => i.productId);
-      return orders
-        .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
-        .reduce((s, o) => s + (o.items || [])
-          .filter(i => productIds.includes(i.id))
-          .reduce((ss, i) => ss + i.price * i.qty, 0), 0);
-    };
+    const calcRevenue = (lot) => orders
+      .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
+      .reduce((s, o) => s + (o.items || [])
+        .filter(i => lot.items.some(li => li.productId === i.id))
+        .reduce((ss, i) => ss + i.price * i.qty, 0), 0);
 
-    const calcLotSold = (lot) => {
-      const productIds = lot.items.map(i => i.productId);
-      return orders
-        .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
-        .reduce((s, o) => s + (o.items || [])
-          .filter(i => productIds.includes(i.id))
-          .reduce((ss, i) => ss + i.qty, 0), 0);
+    const calcSold = (lot) => orders
+      .filter(o => o.status !== "cancelled" && o.ts >= lot.ts)
+      .reduce((s, o) => s + (o.items || [])
+        .filter(i => lot.items.some(li => li.productId === i.id))
+        .reduce((ss, i) => ss + i.qty, 0), 0);
+
+    const closeLot = (lot) => {
+      const rev = calcRevenue(lot);
+      const sol = calcSold(lot);
+      isEditing.current = true;
+      setLots(prev => prev.map(l => l.id === lot.id ? { ...l, status: "closed", closedProfit: rev - lot.totalCost, closedRevenue: rev, closedSold: sol } : l));
+      sfx.success();
+      setTimeout(() => { isEditing.current = false; }, 2000);
     };
 
     return (
       <div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>ล็อตสินค้า</div>
-            <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>บันทึกการซื้อสินค้า · อัปเดตสต็อกและรายจ่ายอัตโนมัติ</div>
-          </div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>ล็อตสินค้า</div>
+          <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>บันทึกการซื้อสินค้า · อัปเดตสต็อกและรายจ่ายอัตโนมัติ</div>
         </div>
 
         {/* Form */}
         <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 4, display: "flex", alignItems: "center", gap: 8 }}>
-            <Icon name="package" size={15} color={C.green600} /> บันทึกล็อตใหม่
-            <span style={{ fontWeight: 600, fontSize: 13, color: C.green600 }}>— {`LOT #${nextLotNum}`}</span>
+          <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 4 }}>
+            บันทึกล็อตใหม่ — <span style={{ color: C.green600 }}>LOT #{nextLotNum}</span>
           </div>
-          <div style={{ fontSize: 11, color: C.gray400, marginBottom: 16 }}>เพิ่มสต็อก + บันทึกรายจ่ายอัตโนมัติ</div>
+          <div style={{ fontSize: 11, color: C.gray400, marginBottom: 16 }}>เพิ่มสต็อก + บันทึกรายจ่ายหมวดต้นทุนสินค้าอัตโนมัติ</div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
             <div>
@@ -2862,123 +2850,96 @@ export default function App() {
               <input type="number" min="0" value={lotTotalCost} onChange={e => setLotTotalCost(e.target.value)} placeholder="เช่น 7250" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
             </div>
             <div>
-              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมายเหตุ (ไม่บังคับ)</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมายเหตุ</label>
               <input value={lotNote} onChange={e => setLotNote(e.target.value)} placeholder="เช่น ตลาดสี่มุมเมือง" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
             </div>
           </div>
 
           <div style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 8 }}>รายการสินค้าในล็อต</div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 90px 90px 36px", gap: 6, marginBottom: 6 }}>
+            <div style={{ fontSize: 10, color: C.gray400 }}>สินค้า</div>
+            <div style={{ fontSize: 10, color: C.gray400 }}>จำนวน</div>
+            <div style={{ fontSize: 10, color: C.gray400 }}>หน่วย</div>
+            <div />
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-            {/* Header */}
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 100px 100px 36px", gap: 8 }}>
-              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>สินค้า</div>
-              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>จำนวน</div>
-              <div style={{ fontSize: 10, color: C.gray400, fontWeight: 600 }}>หน่วย</div>
-              <div />
-            </div>
             {lotItems.map((item, i) => (
-              <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 100px 100px 36px", gap: 8, alignItems: "center" }}>
+              <div key={i} style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) 90px 90px 36px", gap: 8, alignItems: "center" }}>
                 <select value={item.productId} onChange={e => updateLotItem(i, "productId", e.target.value)} style={{ ...inp, fontSize: 13, background: C.white }}>
                   <option value="">-- เลือกสินค้า --</option>
                   {products.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 <input type="number" min="0" value={item.qty} onChange={e => updateLotItem(i, "qty", e.target.value)} placeholder="0" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
-                <input value={item.unit} onChange={e => updateLotItem(i, "unit", e.target.value)} placeholder="โล / ถุง / กล่อง" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                <input value={item.unit} onChange={e => updateLotItem(i, "unit", e.target.value)} placeholder="โล/ถุง/ชิ้น" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
                 <button onClick={() => removeLotItem(i)} disabled={lotItems.length === 1} style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${C.gray200}`, background: C.white, cursor: lotItems.length === 1 ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", opacity: lotItems.length === 1 ? 0.3 : 1 }}>
                   <Icon name="x" size={12} color={C.gray500} sw={2.5} />
                 </button>
               </div>
             ))}
-            <button onClick={addLotItem} style={{ padding: "8px 14px", borderRadius: 8, border: `1px dashed ${C.gray300}`, background: C.gray50, color: C.gray500, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textAlign: "left", fontWeight: 600 }}>
+            <button onClick={addLotItem} style={{ padding: "8px 14px", borderRadius: 8, border: `1px dashed ${C.gray300}`, background: C.gray50, color: C.gray500, fontSize: 12, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
               + เพิ่มสินค้า
             </button>
           </div>
-
-          <BtnP onClick={saveLot} disabled={!canSave}><Icon name="save" size={14} /> บันทึก {`LOT #${nextLotNum}`}</BtnP>
+          <BtnP onClick={saveLot} disabled={!canSave}><Icon name="save" size={14} /> บันทึก LOT #{nextLotNum}</BtnP>
         </div>
 
-        {/* Lots list */}
+        {/* List */}
         {lots.length === 0 ? (
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 48, textAlign: "center" }}>
             <Icon name="package" size={28} color={C.gray200} />
             <div style={{ marginTop: 10, fontSize: 13, color: C.gray400 }}>ยังไม่มีล็อตสินค้า</div>
           </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {lots.map(lot => {
-              const revenue = lot.status === "closed" ? (lot.closedRevenue || 0) : calcLotRevenue(lot);
-              const profit = lot.status === "closed" ? lot.closedProfit : revenue - lot.totalCost;
-              const sold = lot.status === "closed" ? (lot.closedSold || 0) : calcLotSold(lot);
-              const isClosed = lot.status === "closed";
-              return (
-                <div key={lot.id} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <span style={{ fontWeight: 800, fontSize: 16, color: C.gray900 }}>{lot.name}</span>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 12, background: isClosed ? C.gray100 : C.amber50, color: isClosed ? C.gray500 : C.amber600 }}>
-                          {isClosed ? "ปิดล็อตแล้ว" : "กำลังขาย"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12, color: C.gray400, marginTop: 4 }}>
-                        {lot.date ? new Date(lot.date).toLocaleDateString("th-TH") : "-"}
-                        {lot.note ? ` · ${lot.note}` : ""}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {!isClosed && (
-                        <button onClick={() => {
-                          const rev = calcLotRevenue(lot);
-                          const sol = calcLotSold(lot);
-                          isEditing.current = true;
-                          setLots(prev => prev.map(l => l.id === lot.id ? { ...l, status: "closed", closedProfit: rev - lot.totalCost, closedRevenue: rev, closedSold: sol } : l));
-                          setTimeout(() => { isEditing.current = false; }, 2000);
-                          sfx.success();
-                        }} style={{ padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${C.gray300}`, background: C.white, color: C.gray600, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
-                          ปิดล็อต
-                        </button>
-                      )}
-                      <button onClick={() => deleteLot(lot)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.gray200}`, background: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Icon name="trash" size={13} color={C.gray300} />
-                      </button>
-                    </div>
+        ) : lots.map(lot => {
+          const isClosed = lot.status === "closed";
+          const revenue = isClosed ? (lot.closedRevenue || 0) : calcRevenue(lot);
+          const profit = isClosed ? (lot.closedProfit || 0) : revenue - lot.totalCost;
+          const sold = isClosed ? (lot.closedSold || 0) : calcSold(lot);
+          return (
+            <div key={lot.id} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 14 }}>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontWeight: 800, fontSize: 16, color: C.gray900 }}>{lot.name}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 10px", borderRadius: 12, background: isClosed ? C.gray100 : C.amber50, color: isClosed ? C.gray500 : C.amber600 }}>
+                      {isClosed ? "ปิดล็อตแล้ว" : "กำลังขาย"}
+                    </span>
                   </div>
-
-                  {/* สินค้าในล็อต */}
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
-                    {lot.items.map((item, i) => (
-                      <span key={i} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, background: C.gray100, color: C.gray700 }}>
-                        {item.productName} · {item.qty} {item.unit}
-                      </span>
-                    ))}
-                  </div>
-
-                  {/* ตัวเลข */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
-                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>ซื้อมา</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: C.gray700 }}>{lot.totalCost.toLocaleString()}฿</div>
-                    </div>
-                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>ขายแล้ว</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: C.gray700 }}>{sold} ชิ้น</div>
-                    </div>
-                    <div style={{ background: C.gray50, borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>รายรับ{isClosed ? " (lock)" : ""}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: C.green600 }}>{revenue.toLocaleString()}฿</div>
-                    </div>
-                    <div style={{ background: profit >= 0 ? C.green50 : C.red50, borderRadius: 8, padding: "12px 14px" }}>
-                      <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>กำไร{isClosed ? " (lock)" : ""}</div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: profit >= 0 ? C.statusGreen600 : C.red600 }}>
-                        {profit >= 0 ? "+" : ""}{Math.round(profit).toLocaleString()}฿
-                      </div>
-                    </div>
+                  <div style={{ fontSize: 12, color: C.gray400, marginTop: 4 }}>
+                    {lot.date ? new Date(lot.date).toLocaleDateString("th-TH") : "-"}{lot.note ? ` · ${lot.note}` : ""}
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  {!isClosed && <BtnO onClick={() => closeLot(lot)} style={{ padding: "6px 14px", fontSize: 12 }}>ปิดล็อต</BtnO>}
+                  <button onClick={() => deleteLot(lot)} style={{ width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.gray200}`, background: C.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="trash" size={13} color={C.gray300} />
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 14 }}>
+                {(lot.items || []).map((item, i) => (
+                  <span key={i} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 20, background: C.gray100, color: C.gray700 }}>
+                    {item.productName} · {item.qty} {item.unit}
+                  </span>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12 }}>
+                {[
+                  { label: "ซื้อมา", value: lot.totalCost.toLocaleString() + "฿", color: C.gray700, bg: C.gray50 },
+                  { label: "ขายแล้ว", value: sold + " ชิ้น", color: C.gray700, bg: C.gray50 },
+                  { label: `รายรับ${isClosed ? " (lock)" : ""}`, value: revenue.toLocaleString() + "฿", color: C.green600, bg: C.gray50 },
+                  { label: `กำไร${isClosed ? " (lock)" : ""}`, value: (profit >= 0 ? "+" : "") + Math.round(profit).toLocaleString() + "฿", color: profit >= 0 ? C.statusGreen600 : C.red600, bg: profit >= 0 ? C.green50 : C.red50 },
+                ].map((k, i) => (
+                  <div key={i} style={{ background: k.bg, borderRadius: 8, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 11, color: C.gray400, fontWeight: 600, marginBottom: 4 }}>{k.label}</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: k.color }}>{k.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
