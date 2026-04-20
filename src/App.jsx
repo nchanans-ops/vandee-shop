@@ -2096,12 +2096,21 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
     const lastMonth = (() => { const d = new Date(now.getFullYear(), now.getMonth()-1, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; })();
 
     const filterByPeriod = (list) => {
+      if (expFilter === "today") { const today = now.toISOString().slice(0,10); return list.filter(e => e.date === today); }
+      if (expFilter === "week") {
+        const day = now.getDay();
+        const monday = new Date(now); monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); monday.setHours(0,0,0,0);
+        const mondayStr = monday.toISOString().slice(0,10);
+        const todayStr = now.toISOString().slice(0,10);
+        return list.filter(e => e.date >= mondayStr && e.date <= todayStr);
+      }
       if (expFilter === "month") return list.filter(e => e.date?.slice(0,7) === thisMonth);
       if (expFilter === "lastmonth") return list.filter(e => e.date?.slice(0,7) === lastMonth);
       if (expFilter === "3months") {
         const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().slice(0,7);
         return list.filter(e => e.date?.slice(0,7) >= cutoff);
       }
+      if (expFilter === "year") return list.filter(e => e.date?.slice(0,4) === String(now.getFullYear()));
       if (expFilter === "custom") {
         return list.filter(e => {
           if (!e.date) return false;
@@ -2299,28 +2308,49 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
           {/* Right: expense list */}
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, overflow: "hidden" }}>
             {/* Filter bar */}
-            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.gray100}`, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-              <select value={expFilter} onChange={e => setExpFilter(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }}>
-                <option value="month">เดือนนี้</option>
-                <option value="lastmonth">เดือนที่แล้ว</option>
-                <option value="3months">3 เดือนล่าสุด</option>
-                <option value="all">ทั้งหมด</option>
-                <option value="custom">เลือกวันที่</option>
-              </select>
-              {expFilter === "custom" && (
-                <>
-                  <input type="date" value={expDateFrom} onChange={e => setExpDateFrom(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
-                  <span style={{ fontSize: 12, color: C.gray400 }}>ถึง</span>
-                  <input type="date" value={expDateTo} onChange={e => setExpDateTo(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
-                </>
-              )}
-              <select value={expCatFilter} onChange={e => setExpCatFilter(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }}>
-                <option value="all">ทุกหมวดหมู่</option>
-                {expenseCats.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              <div style={{ marginLeft: "auto", fontSize: 12, color: C.gray400 }}>{filteredExpenses.length} รายการ</div>
-              <BtnO onClick={exportExpensesCSV} style={{ padding: "7px 12px", fontSize: 12 }}><Icon name="download" size={13} /> Export CSV</BtnO>
-              {sheetUrl && <BtnO onClick={syncAllExpensesToSheet} style={{ padding: "7px 12px", fontSize: 12 }}><Icon name="refreshCw" size={13} /> Sync Sheet</BtnO>}
+            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.gray100}`, display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Period button group */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.gray400, marginRight: 4 }}>ช่วงเวลา:</span>
+                {[
+                  { key: "today", label: "วันนี้" },
+                  { key: "week", label: "สัปดาห์นี้" },
+                  { key: "month", label: "เดือนนี้" },
+                  { key: "year", label: "ปีนี้" },
+                  { key: "custom", label: "กำหนดเอง" },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => setExpFilter(opt.key)} style={{
+                    padding: "6px 14px", borderRadius: 8, border: `1.5px solid ${expFilter === opt.key ? C.green600 : C.gray200}`,
+                    background: expFilter === opt.key ? C.green600 : C.white,
+                    color: expFilter === opt.key ? C.white : C.gray600,
+                    fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                  }}>{opt.label}</button>
+                ))}
+                {expFilter === "custom" && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+                    <input type="date" value={expDateFrom} onChange={e => setExpDateFrom(e.target.value)} style={{ ...inp, width: 140, padding: "6px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
+                    <span style={{ fontSize: 12, color: C.gray400 }}>ถึง</span>
+                    <input type="date" value={expDateTo} onChange={e => setExpDateTo(e.target.value)} style={{ ...inp, width: 140, padding: "6px 10px", fontSize: 12 }} onFocus={focus} onBlur={blur} />
+                  </div>
+                )}
+              </div>
+              {/* Category filter + actions */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: C.gray400, marginRight: 4 }}>หมวดหมู่:</span>
+                {["all", ...expenseCats].map(c => (
+                  <button key={c} onClick={() => setExpCatFilter(c)} style={{
+                    padding: "5px 12px", borderRadius: 20, border: `1.5px solid ${expCatFilter === c ? C.green600 : C.gray200}`,
+                    background: expCatFilter === c ? C.green50 : C.white,
+                    color: expCatFilter === c ? C.green700 : C.gray500,
+                    fontWeight: 600, fontSize: 11, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                  }}>{c === "all" ? "ทั้งหมด" : c}</button>
+                ))}
+                <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: C.gray400 }}>{filteredExpenses.length} รายการ</span>
+                  <BtnO onClick={exportExpensesCSV} style={{ padding: "6px 12px", fontSize: 12 }}><Icon name="download" size={13} /> CSV</BtnO>
+                  {sheetUrl && <BtnO onClick={syncAllExpensesToSheet} style={{ padding: "6px 12px", fontSize: 12 }}><Icon name="refreshCw" size={13} /> Sync Sheet</BtnO>}
+                </div>
+              </div>
             </div>
 
             {/* Table header */}
