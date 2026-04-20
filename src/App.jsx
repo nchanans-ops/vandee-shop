@@ -2493,15 +2493,12 @@ export default function App() {
 
     const revenue = activeOrders.reduce((s, o) => s + (o.total || 0), 0);
     const totalDiscount = activeOrders.reduce((s, o) => s + (o.discount || 0), 0);
-    // COGS = expenses หมวด ต้นทุนสินค้า (จากล็อต)
-    const costExp = activeExp.filter(e => e.cat === 'ต้นทุนสินค้า');
-    const cogs = costExp.reduce((s, e) => s + (e.amount || 0), 0);
-    const opExp = activeExp.filter(e => e.cat !== 'ต้นทุนสินค้า');
+    const cogs = 0;
+    const opExp = activeExp;
     const totalExp = opExp.reduce((s, e) => s + (e.amount || 0), 0);
-    const netProfit = revenue - cogs - totalExp - totalDiscount;
+    const netProfit = revenue - totalExp - totalDiscount;
     const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0.0';
 
-    // ตารางสรุป: แสดง COGS แยก + OpEx แยกหมวด
     const expByCat = {};
     opExp.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
     const expCatRows = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
@@ -2562,7 +2559,7 @@ export default function App() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12, marginBottom: 20 }}>
           {[
             { label: 'รายรับ', value: revenue.toLocaleString() + '฿', sub: activeOrders.length + ' ออเดอร์', color: C.green600 },
-            { label: 'ต้นทุนรวม', value: (cogs + totalExp).toLocaleString() + '฿', sub: 'COGS + OpEx', color: C.gray600 },
+            { label: 'รายจ่ายรวม', value: totalExp.toLocaleString() + '฿', sub: activeExp.length + ' รายการ', color: C.gray600 },
             { label: 'กำไรสุทธิ', value: netProfit.toLocaleString() + '฿', sub: 'margin ' + margin + '%', color: C.statusGreen600 },
             { label: 'ส่วนลดที่ให้', value: totalDiscount.toLocaleString() + '฿', sub: activeOrders.filter(o => o.discount > 0).length + ' ออเดอร์', color: C.amber600 },
           ].map((k, i) => (
@@ -2646,10 +2643,6 @@ export default function App() {
                 <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
                   <td style={{ padding: '9px 0', color: C.gray500 }}>รายรับรวม</td>
                   <td style={{ padding: '9px 0', textAlign: 'right', color: C.green600, fontWeight: 600 }}>{revenue.toLocaleString()}฿</td>
-                </tr>
-                <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: '9px 0', color: C.gray500 }}>ต้นทุนสินค้า (COGS)</td>
-                  <td style={{ padding: '9px 0', textAlign: 'right', color: C.gray600, fontWeight: 600 }}>-{cogs.toLocaleString()}฿</td>
                 </tr>
                 {expCatRows.map(([cat, amt]) => (
                   <tr key={cat} style={{ borderBottom: `1px solid ${C.gray100}` }}>
