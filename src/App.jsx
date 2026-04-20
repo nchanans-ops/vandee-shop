@@ -1274,22 +1274,7 @@ export default function App() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ชื่อสินค้า</label><input value={prodForm.name} onChange={e => setProdForm(p => ({ ...p, name: e.target.value }))} placeholder="เช่น Espresso" style={inp} onFocus={focus} onBlur={blur} /></div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคาขาย (฿)</label>
-              <input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
-            </div>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
-                ต้นทุน/ชิ้น (฿)
-                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: C.green50, color: C.green700 }}>ใช้คำนวณกำไร</span>
-              </label>
-              <input type="number" value={prodForm.cost} onChange={e => setProdForm(p => ({ ...p, cost: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
-              {prodForm.price && prodForm.cost && Number(prodForm.price) > 0 && (
-                <div style={{ marginTop: 5, fontSize: 11, color: C.green600, fontWeight: 600 }}>
-                  margin {((Number(prodForm.price) - Number(prodForm.cost)) / Number(prodForm.price) * 100).toFixed(1)}% · กำไร {(Number(prodForm.price) - Number(prodForm.cost)).toLocaleString()}฿/ชิ้น
-                </div>
-              )}
-            </div>
+            <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคาขาย (฿)</label><input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนสต็อก (ชิ้น)</label><input type="number" value={prodForm.stock} onChange={e => setProdForm(p => ({ ...p, stock: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รายละเอียด</label><input value={prodForm.desc} onChange={e => setProdForm(p => ({ ...p, desc: e.target.value }))} placeholder="คำอธิบายสั้น ๆ" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมวดหมู่</label><select value={prodForm.cat} onChange={e => setProdForm(p => ({ ...p, cat: e.target.value }))} style={{ ...inp, cursor: "pointer" }}>{categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
