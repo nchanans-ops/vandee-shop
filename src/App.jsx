@@ -1292,7 +1292,7 @@ export default function App() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: C.gray50, borderBottom: `1px solid ${C.gray200}` }}>
-              {["สินค้า", "หมวดหมู่", "ราคาขาย", "ต้นทุน", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
+              {["สินค้า", "หมวดหมู่", "ราคา", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -1308,7 +1308,6 @@ export default function App() {
                   </td>
                   <td style={{ padding: "10px 16px", color: C.gray500 }}>{catLabel}</td>
                   <td style={{ padding: "10px 16px", fontWeight: 700, color: C.green600 }}>{p.price}฿</td>
-                  <td style={{ padding: "10px 16px", color: p.cost ? C.gray600 : C.gray300, fontSize: 13 }}>{p.cost ? `${p.cost}฿` : "-"}</td>
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{ fontWeight: 700, color: (p.stock ?? 0) <= 5 ? C.red500 : (p.stock ?? 0) <= 20 ? C.amber600 : C.gray700 }}>{p.stock ?? 0}</span>
                     <span style={{ fontSize: 11, color: C.gray400, marginLeft: 3 }}>ชิ้น</span>
