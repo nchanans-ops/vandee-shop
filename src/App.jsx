@@ -1274,7 +1274,22 @@ export default function App() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ชื่อสินค้า</label><input value={prodForm.name} onChange={e => setProdForm(p => ({ ...p, name: e.target.value }))} placeholder="เช่น Espresso" style={inp} onFocus={focus} onBlur={blur} /></div>
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคา (บาท)</label><input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>ราคาขาย (฿)</label>
+              <input type="number" value={prodForm.price} onChange={e => setProdForm(p => ({ ...p, price: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
+            </div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                ต้นทุน/ชิ้น (฿)
+                <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: C.green50, color: C.green700 }}>ใช้คำนวณกำไร</span>
+              </label>
+              <input type="number" value={prodForm.cost} onChange={e => setProdForm(p => ({ ...p, cost: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} />
+              {prodForm.price && prodForm.cost && Number(prodForm.price) > 0 && (
+                <div style={{ marginTop: 5, fontSize: 11, color: C.green600, fontWeight: 600 }}>
+                  margin {((Number(prodForm.price) - Number(prodForm.cost)) / Number(prodForm.price) * 100).toFixed(1)}% · กำไร {(Number(prodForm.price) - Number(prodForm.cost)).toLocaleString()}฿/ชิ้น
+                </div>
+              )}
+            </div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนสต็อก (ชิ้น)</label><input type="number" value={prodForm.stock} onChange={e => setProdForm(p => ({ ...p, stock: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รายละเอียด</label><input value={prodForm.desc} onChange={e => setProdForm(p => ({ ...p, desc: e.target.value }))} placeholder="คำอธิบายสั้น ๆ" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมวดหมู่</label><select value={prodForm.cat} onChange={e => setProdForm(p => ({ ...p, cat: e.target.value }))} style={{ ...inp, cursor: "pointer" }}>{categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
@@ -1292,7 +1307,7 @@ export default function App() {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ background: C.gray50, borderBottom: `1px solid ${C.gray200}` }}>
-              {["สินค้า", "หมวดหมู่", "ราคา", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
+              {["สินค้า", "หมวดหมู่", "ราคาขาย", "ต้นทุน", "สต็อก", "สถานะ", "จัดการ"].map(h => <th key={h} style={{ padding: "12px 16px", textAlign: "left", fontWeight: 700, color: C.gray500, fontSize: 12 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -1308,6 +1323,7 @@ export default function App() {
                   </td>
                   <td style={{ padding: "10px 16px", color: C.gray500 }}>{catLabel}</td>
                   <td style={{ padding: "10px 16px", fontWeight: 700, color: C.green600 }}>{p.price}฿</td>
+                  <td style={{ padding: "10px 16px", color: p.cost ? C.gray600 : C.gray300, fontSize: 13 }}>{p.cost ? `${p.cost}฿` : "-"}</td>
                   <td style={{ padding: "10px 16px" }}>
                     <span style={{ fontWeight: 700, color: (p.stock ?? 0) <= 5 ? C.red500 : (p.stock ?? 0) <= 20 ? C.amber600 : C.gray700 }}>{p.stock ?? 0}</span>
                     <span style={{ fontSize: 11, color: C.gray400, marginLeft: 3 }}>ชิ้น</span>
@@ -2418,45 +2434,63 @@ export default function App() {
   };
 
   /* ════════════════════════════════════════════════════
-     PAGE: ANALYTICS
+     PAGE: ANALYTICS v2
      ════════════════════════════════════════════════════ */
   const renderAnalytics = () => {
     const now = new Date();
-    const thisYear = String(now.getFullYear());
-    const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    const yr = now.getFullYear();
+    const mo = now.getMonth();
+    const thisMonth = `${yr}-${String(mo+1).padStart(2,'0')}`;
+    const thisYear = String(yr);
 
-    const filterOrders = (list) => {
-      if (analyticsFilter === "month") return list.filter(o => o.date?.slice(0,7) === thisMonth || (o.ts && new Date(o.ts).toISOString().slice(0,7) === thisMonth));
-      if (analyticsFilter === "3months") {
-        const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1);
-        return list.filter(o => o.ts && new Date(o.ts) >= cutoff);
+    const fltOrders = (list) => {
+      if (analyticsFilter === 'month') return list.filter(o => {
+        const d = o.ts ? new Date(o.ts).toISOString().slice(0,7) : o.date?.slice(0,7);
+        return d === thisMonth;
+      });
+      if (analyticsFilter === '3months') {
+        const cut = new Date(yr, mo-2, 1).getTime();
+        return list.filter(o => o.ts && o.ts >= cut);
       }
-      if (analyticsFilter === "year") return list.filter(o => o.date?.slice(0,4) === thisYear || (o.ts && new Date(o.ts).getFullYear() === now.getFullYear()));
+      if (analyticsFilter === 'year') return list.filter(o => {
+        const d = o.ts ? String(new Date(o.ts).getFullYear()) : o.date?.slice(0,4);
+        return d === thisYear;
+      });
+      return list;
+    };
+    const fltExp = (list) => {
+      if (analyticsFilter === 'month') return list.filter(e => e.date?.slice(0,7) === thisMonth);
+      if (analyticsFilter === '3months') {
+        const cut = new Date(yr, mo-2, 1).toISOString().slice(0,7);
+        return list.filter(e => e.date?.slice(0,7) >= cut);
+      }
+      if (analyticsFilter === 'year') return list.filter(e => e.date?.slice(0,4) === thisYear);
       return list;
     };
 
-    const filterExpenses = (list) => {
-      if (analyticsFilter === "month") return list.filter(e => e.date?.slice(0,7) === thisMonth);
-      if (analyticsFilter === "3months") {
-        const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().slice(0,7);
-        return list.filter(e => e.date?.slice(0,7) >= cutoff);
-      }
-      if (analyticsFilter === "year") return list.filter(e => e.date?.slice(0,4) === thisYear);
-      return list;
-    };
+    const activeOrders = fltOrders(orders.filter(o => o.status !== 'cancelled'));
+    const activeExp = fltExp(expenses);
 
-    const filtOrders = filterOrders(orders.filter(o => o.status !== "cancelled"));
-    const filtExpenses = filterExpenses(expenses);
+    const revenue = activeOrders.reduce((s, o) => s + (o.total || 0), 0);
+    const totalDiscount = activeOrders.reduce((s, o) => s + (o.discount || 0), 0);
+    const cogs = activeOrders.reduce((s, o) =>
+      s + (o.items || []).reduce((ss, item) => {
+        const p = products.find(x => x.id === item.id);
+        return ss + (p?.cost || 0) * item.qty;
+      }, 0), 0);
+    // expenses ที่ใช้คำนวณ = ทุกหมวด ยกเว้น "ต้นทุนสินค้า" (เพราะใช้ COGS แทน)
+    const opExp = activeExp.filter(e => e.cat !== 'ต้นทุนสินค้า');
+    const totalExp = opExp.reduce((s, e) => s + (e.amount || 0), 0);
+    const netProfit = revenue - cogs - totalExp - totalDiscount;
+    const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0.0';
 
-    const totalRevenue = filtOrders.reduce((s, o) => s + (o.total || 0), 0);
-    const totalExpenses = filtExpenses.reduce((s, e) => s + (e.amount || 0), 0);
-    const totalDiscount = filtOrders.reduce((s, o) => s + (o.discount || 0), 0);
-    const grossProfit = totalRevenue - cogs - totalExpenses - totalDiscount;
-    const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : "0.0";
+    // แสดงในตาราง: แยก COGS (จาก cost×qty) และ OpEx แยกหมวด
+    const expByCat = {};
+    opExp.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
+    const expCatRows = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
 
-    // สินค้าขายดี
     const productSales = {};
-    filtOrders.forEach(o => {
+    activeOrders.forEach(o => {
       (o.items || []).forEach(item => {
         if (!productSales[item.name]) productSales[item.name] = { qty: 0, revenue: 0 };
         productSales[item.name].qty += item.qty;
@@ -2464,257 +2498,214 @@ export default function App() {
       });
     });
     const topProducts = Object.entries(productSales).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5);
-    const maxRevenue = topProducts[0]?.[1].revenue || 1;
+    const maxRev = topProducts[0]?.[1].revenue || 1;
 
-    // รายจ่ายแยกหมวด
-    const expByCat = {};
-    filtExpenses.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
-    const expCatList = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
-    // COGS คำนวณจาก cost × qty ที่ขายจริง
-    const cogs = filtOrders.reduce((sum, o) => {
-      return sum + (o.items || []).reduce((s, item) => {
-        const prod = products.find(p => p.id === item.id);
-        return s + (prod?.cost || 0) * item.qty;
-      }, 0);
-    }, 0);
-    const costOfGoods = cogs;
-    const otherExp = totalExpenses;
-
-    // กราฟรายเดือน (6 เดือนล่าสุด)
     const chartMonths = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
-      return { key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`, label: d.toLocaleDateString("th-TH", { month: "short" }) };
+      const d = new Date(yr, mo - 5 + i, 1);
+      return {
+        key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`,
+        label: d.toLocaleDateString('th-TH', { month: 'short' }),
+      };
     });
-    const chartRevenue = chartMonths.map(m => orders.filter(o => o.status !== "cancelled" && (o.date?.slice(0,7) === m.key || (o.ts && new Date(o.ts).toISOString().slice(0,7) === m.key))).reduce((s, o) => s + (o.total || 0), 0));
-    const chartExpenses = chartMonths.map(m => expenses.filter(e => e.date?.slice(0,7) === m.key).reduce((s, e) => s + (e.amount || 0), 0));
-    const chartProfit = chartMonths.map((_, i) => chartRevenue[i] - chartExpenses[i]);
+    const chartRev = chartMonths.map(m =>
+      orders.filter(o => o.status !== 'cancelled' && (o.ts ? new Date(o.ts).toISOString().slice(0,7) : o.date?.slice(0,7)) === m.key)
+        .reduce((s, o) => s + (o.total || 0), 0));
+    const chartExp = chartMonths.map(m =>
+      expenses.filter(e => e.date?.slice(0,7) === m.key).reduce((s, e) => s + (e.amount || 0), 0));
+    const chartProfitData = chartMonths.map((_, i) => chartRev[i] - chartExp[i]);
 
-    const donutColors = ["#8B1A1A","#a52222","#c44040","#d97706","#6b7280","#374151"];
-
-    const filterLabels = [
-      { key: "month", label: "เดือนนี้" },
-      { key: "3months", label: "3 เดือน" },
-      { key: "year", label: "ปีนี้" },
-      { key: "all", label: "ทั้งหมด" },
+    const donutColors = ['#8B1A1A','#a52222','#c44040','#d97706','#6b7280','#374151'];
+    const filterBtns = [
+      { key: 'month', label: 'เดือนนี้' },
+      { key: '3months', label: '3 เดือน' },
+      { key: 'year', label: 'ปีนี้' },
+      { key: 'all', label: 'ทั้งหมด' },
     ];
 
     return (
-      <div data-page="analytics">
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>วิเคราะห์</div>
             <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>รายรับ · รายจ่าย · กำไรสุทธิ</div>
           </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {filterLabels.map(f => (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {filterBtns.map(f => (
               <button key={f.key} onClick={() => setAnalyticsFilter(f.key)} style={{
-                padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${analyticsFilter === f.key ? C.green600 : C.gray200}`,
+                padding: '7px 16px', borderRadius: 8,
+                border: `1.5px solid ${analyticsFilter === f.key ? C.green600 : C.gray200}`,
                 background: analyticsFilter === f.key ? C.green600 : C.white,
                 color: analyticsFilter === f.key ? C.white : C.gray600,
-                fontWeight: 600, fontSize: 12, cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
+                fontWeight: 600, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit',
               }}>{f.label}</button>
             ))}
           </div>
         </div>
 
-        {/* KPI cards */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 12, marginBottom: 20 }}>
           {[
-            { label: "รายรับ", value: `${totalRevenue.toLocaleString()}฿`, sub: `${filtOrders.length} ออเดอร์`, color: C.green600 },
-            { label: "รายจ่ายรวม", value: `${totalExpenses.toLocaleString()}฿`, sub: `${filtExpenses.length} รายการ`, color: C.gray600 },
-            { label: "กำไรสุทธิ", value: `${grossProfit.toLocaleString()}฿`, sub: `margin ${margin}%`, color: C.statusGreen600 },
-            { label: "ส่วนลดที่ให้", value: `${totalDiscount.toLocaleString()}฿`, sub: `${filtOrders.filter(o => o.discount > 0).length} ออเดอร์`, color: C.amber600 },
+            { label: 'รายรับ', value: revenue.toLocaleString() + '฿', sub: activeOrders.length + ' ออเดอร์', color: C.green600 },
+            { label: 'ต้นทุนรวม', value: (cogs + totalExp).toLocaleString() + '฿', sub: 'COGS + OpEx', color: C.gray600 },
+            { label: 'กำไรสุทธิ', value: netProfit.toLocaleString() + '฿', sub: 'margin ' + margin + '%', color: C.statusGreen600 },
+            { label: 'ส่วนลดที่ให้', value: totalDiscount.toLocaleString() + '฿', sub: activeOrders.filter(o => o.discount > 0).length + ' ออเดอร์', color: C.amber600 },
           ].map((k, i) => (
-            <div key={i} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
+            <div key={i} style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: '16px 20px' }}>
               <div style={{ fontSize: 12, color: C.gray400, fontWeight: 600, marginBottom: 6 }}>{k.label}</div>
-              <div style={{ fontSize: 24, fontWeight: 800, color: k.color }}>{k.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 800, color: k.color }}>{k.value}</div>
               <div style={{ fontSize: 11, color: C.gray400, marginTop: 4 }}>{k.sub}</div>
             </div>
           ))}
         </div>
 
-        {/* Chart row */}
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(0,1fr)", gap: 16, marginBottom: 16 }}>
-
-          {/* Bar chart */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)', gap: 16, marginBottom: 16 }}>
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 8 }}>รายรับ vs รายจ่าย vs กำไร (6 เดือนล่าสุด)</div>
-            <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-              {[["#8B1A1A","รายรับ"],["#9ca3af","รายจ่าย"],["#16a34a","กำไร"]].map(([c,l]) => (
-                <span key={l} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.gray500 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: "inline-block" }} />{l}
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+              {[['#8B1A1A','รายรับ'],['#9ca3af','รายจ่าย'],['#16a34a','กำไร']].map(([c,l]) => (
+                <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: C.gray500 }}>
+                  <span style={{ width: 10, height: 10, borderRadius: 2, background: c, display: 'inline-block' }} />{l}
                 </span>
               ))}
             </div>
-            <div style={{ position: "relative", height: 200 }}>
-              <canvas id="analyticsBar" role="img" aria-label="กราฟแท่งรายรับ รายจ่าย กำไร 6 เดือนล่าสุด">รายรับ รายจ่าย กำไร</canvas>
+            <div style={{ position: 'relative', height: 200 }}>
+              <canvas id='analyticsBar' role='img' aria-label='bar chart'>bar</canvas>
             </div>
+            <div id='analytics-data'
+              data-rev={JSON.stringify(chartRev)}
+              data-exp={JSON.stringify(chartExp)}
+              data-profit={JSON.stringify(chartProfitData)}
+              data-labels={JSON.stringify(chartMonths.map(m => m.label))}
+              data-catnames={JSON.stringify(expCatRows.map(c => c[0]))}
+              data-catvals={JSON.stringify(expCatRows.map(c => c[1]))}
+            />
           </div>
 
-          {/* Donut รายจ่าย */}
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 12 }}>สัดส่วนรายจ่าย</div>
-            {expCatList.length > 0 ? <>
-              <div style={{ position: "relative", height: 150 }}>
-                <canvas id="analyticsDonut" role="img" aria-label="สัดส่วนรายจ่ายแยกหมวด">สัดส่วนรายจ่าย</canvas>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 12 }}>
-                {expCatList.slice(0,5).map(([cat, amt], i) => (
-                  <span key={cat} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 11, color: C.gray500 }}>
-                    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 2, background: donutColors[i] || C.gray300, display: "inline-block" }} />{cat}
+            {expCatRows.length > 0 ? (
+              <>
+                <div style={{ position: 'relative', height: 150 }}>
+                  <canvas id='analyticsDonut' role='img' aria-label='donut chart'>donut</canvas>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 12 }}>
+                  {expCatRows.slice(0,5).map(([cat, amt], i) => (
+                    <span key={cat} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: C.gray500 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: 2, background: donutColors[i] || C.gray300, display: 'inline-block' }} />{cat}
+                      </span>
+                      <span>{totalExp > 0 ? Math.round(amt/totalExp*100) : 0}%</span>
                     </span>
-                    <span>{totalExpenses > 0 ? Math.round(amt/totalExpenses*100) : 0}%</span>
-                  </span>
-                ))}
-              </div>
-            </> : <div style={{ padding: "40px 0", textAlign: "center", color: C.gray300, fontSize: 13 }}>ยังไม่มีรายจ่าย</div>}
+                  ))}
+                </div>
+              </>
+            ) : <div style={{ padding: '40px 0', textAlign: 'center', color: C.gray300, fontSize: 13 }}>ยังไม่มีรายจ่าย</div>}
           </div>
         </div>
 
-        {/* Bottom row */}
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 16 }}>
-
-          {/* สินค้าขายดี */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,1fr)', gap: 16 }}>
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สินค้าขายดี (รายได้)</div>
             {topProducts.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {topProducts.map(([name, data]) => (
                   <div key={name}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                       <span style={{ color: C.gray700 }}>{name}</span>
                       <span style={{ color: C.gray400 }}>{data.revenue.toLocaleString()}฿ · {data.qty} ชิ้น</span>
                     </div>
                     <div style={{ background: C.gray100, borderRadius: 4, height: 5 }}>
-                      <div style={{ background: C.green600, width: `${Math.round(data.revenue/maxRevenue*100)}%`, height: 5, borderRadius: 4 }} />
+                      <div style={{ background: C.green600, width: `${Math.round(data.revenue/maxRev*100)}%`, height: 5, borderRadius: 4 }} />
                     </div>
                   </div>
                 ))}
               </div>
-            ) : <div style={{ padding: "40px 0", textAlign: "center", color: C.gray300, fontSize: 13 }}>ยังไม่มีออเดอร์</div>}
+            ) : <div style={{ padding: '40px 0', textAlign: 'center', color: C.gray300, fontSize: 13 }}>ยังไม่มีออเดอร์</div>}
           </div>
 
-          {/* ตารางสรุป */}
           <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14 }}>สรุปภาพรวม</div>
-            <table style={{ width: "100%", fontSize: 13, borderCollapse: "collapse" }}>
+            <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
               <tbody>
-              {/* รายรับ */}
-              <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                <td style={{ padding: "9px 0", color: C.gray500 }}>รายรับรวม</td>
-                <td style={{ padding: "9px 0", textAlign: "right", color: C.green600, fontWeight: 600 }}>{totalRevenue.toLocaleString()}฿</td>
-              </tr>
-              {/* COGS */}
-              <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                <td style={{ padding: "9px 0", color: C.gray500 }}>ต้นทุนสินค้า (COGS)</td>
-                <td style={{ padding: "9px 0", textAlign: "right", color: C.gray600, fontWeight: 600 }}>-{cogs.toLocaleString()}฿</td>
-              </tr>
-              {/* expenses แยกหมวด */}
-              {expCatList.map(([cat, amt]) => (
-                <tr key={cat} style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "8px 0 8px 12px", color: C.gray400, fontSize: 12 }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.gray300, display: "inline-block" }} />
-                      {cat}
-                    </span>
-                  </td>
-                  <td style={{ padding: "8px 0", textAlign: "right", color: C.gray500, fontSize: 12 }}>-{amt.toLocaleString()}฿</td>
-                </tr>
-              ))}
-              {expCatList.length === 0 && (
                 <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "8px 0 8px 12px", color: C.gray300, fontSize: 12 }}>ยังไม่มีรายจ่าย</td>
-                  <td style={{ padding: "8px 0", textAlign: "right", color: C.gray300, fontSize: 12 }}>-0฿</td>
+                  <td style={{ padding: '9px 0', color: C.gray500 }}>รายรับรวม</td>
+                  <td style={{ padding: '9px 0', textAlign: 'right', color: C.green600, fontWeight: 600 }}>{revenue.toLocaleString()}฿</td>
                 </tr>
-              )}
-              {/* ส่วนลด */}
-              {totalDiscount > 0 && (
                 <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
-                  <td style={{ padding: "9px 0", color: C.gray500 }}>ส่วนลดที่ให้</td>
-                  <td style={{ padding: "9px 0", textAlign: "right", color: C.amber600, fontWeight: 600 }}>-{totalDiscount.toLocaleString()}฿</td>
+                  <td style={{ padding: '9px 0', color: C.gray500 }}>ต้นทุนสินค้า (COGS)</td>
+                  <td style={{ padding: '9px 0', textAlign: 'right', color: C.gray600, fontWeight: 600 }}>-{cogs.toLocaleString()}฿</td>
                 </tr>
-              )}
-              {/* กำไรสุทธิ */}
-              <tr>
-                <td style={{ padding: "12px 0 0", fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
-                <td style={{ padding: "12px 0 0", textAlign: "right", fontWeight: 800, fontSize: 20, color: grossProfit >= 0 ? C.statusGreen600 : C.red600 }}>{grossProfit.toLocaleString()}฿</td>
-              </tr>
+                {expCatRows.map(([cat, amt]) => (
+                  <tr key={cat} style={{ borderBottom: `1px solid ${C.gray100}` }}>
+                    <td style={{ padding: '7px 0 7px 14px', color: C.gray400, fontSize: 12 }}>· {cat}</td>
+                    <td style={{ padding: '7px 0', textAlign: 'right', color: C.gray500, fontSize: 12 }}>-{amt.toLocaleString()}฿</td>
+                  </tr>
+                ))}
+                {totalDiscount > 0 && (
+                  <tr style={{ borderBottom: `1px solid ${C.gray100}` }}>
+                    <td style={{ padding: '9px 0', color: C.gray500 }}>ส่วนลดที่ให้</td>
+                    <td style={{ padding: '9px 0', textAlign: 'right', color: C.amber600, fontWeight: 600 }}>-{totalDiscount.toLocaleString()}฿</td>
+                  </tr>
+                )}
+                <tr>
+                  <td style={{ padding: '12px 0 0', fontWeight: 800, fontSize: 15, color: C.gray900 }}>กำไรสุทธิ</td>
+                  <td style={{ padding: '12px 0 0', textAlign: 'right', fontWeight: 800, fontSize: 20, color: netProfit >= 0 ? C.statusGreen600 : C.red600 }}>{netProfit.toLocaleString()}฿</td>
+                </tr>
               </tbody>
             </table>
-            <div style={{ marginTop: 16, padding: "10px 14px", background: C.green50, borderRadius: 8 }}>
-              <div style={{ fontSize: 12, color: C.green600, fontWeight: 700 }}>Net Margin {margin}%</div>
+            <div style={{ marginTop: 14, padding: '10px 14px', background: C.green50, borderRadius: 8 }}>
+              <div style={{ fontSize: 12, color: C.green700, fontWeight: 700 }}>Net Margin {margin}%</div>
               <div style={{ background: C.gray200, borderRadius: 4, height: 5, marginTop: 6 }}>
                 <div style={{ background: C.green600, width: `${Math.min(Math.max(parseFloat(margin),0),100)}%`, height: 5, borderRadius: 4 }} />
               </div>
             </div>
           </div>
         </div>
-
-        {/* Chart.js script */}
-        <div id="analytics-charts-container" data-revenue={JSON.stringify(chartRevenue)} data-expenses={JSON.stringify(chartExpenses)} data-profit={JSON.stringify(chartProfit)} data-labels={JSON.stringify(chartMonths.map(m => m.label))} data-catnames={JSON.stringify(expCatList.map(c => c[0]))} data-catvals={JSON.stringify(expCatList.map(c => c[1]))} />
       </div>
     );
   };
 
   useEffect(() => {
-    if (page !== "analytics") return;
-    const container = document.getElementById("analytics-charts-container");
-    if (!container) return;
-    const revenue = JSON.parse(container.dataset.revenue || "[]");
-    const expensesData = JSON.parse(container.dataset.expenses || "[]");
-    const profit = JSON.parse(container.dataset.profit || "[]");
-    const labels = JSON.parse(container.dataset.labels || "[]");
-    const catNames = JSON.parse(container.dataset.catnames || "[]");
-    const catVals = JSON.parse(container.dataset.catvals || "[]");
-
-    const loadChartJs = () => {
-      if (window.Chart) { drawCharts(); return; }
-      const s = document.createElement("script");
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js";
-      s.onload = drawCharts;
-      document.head.appendChild(s);
-    };
-
-    const drawCharts = () => {
-      const barEl = document.getElementById("analyticsBar");
-      const donutEl = document.getElementById("analyticsDonut");
-      if (barEl) {
-        if (barEl._chartInstance) barEl._chartInstance.destroy();
-        barEl._chartInstance = new window.Chart(barEl, {
-          type: "bar",
-          data: {
-            labels,
-            datasets: [
-              { label: "รายรับ", data: revenue, backgroundColor: "#8B1A1A" },
-              { label: "รายจ่าย", data: expensesData, backgroundColor: "#9ca3af" },
-              { label: "กำไร", data: profit, backgroundColor: "#16a34a" },
-            ],
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-              y: { grid: { color: "rgba(0,0,0,0.05)" }, ticks: { font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+"k" : v } },
-            },
-          },
+    if (page !== 'analytics') return;
+    const el = document.getElementById('analytics-data');
+    if (!el) return;
+    const rev = JSON.parse(el.dataset.rev || '[]');
+    const exp = JSON.parse(el.dataset.exp || '[]');
+    const profit = JSON.parse(el.dataset.profit || '[]');
+    const labels = JSON.parse(el.dataset.labels || '[]');
+    const catNames = JSON.parse(el.dataset.catnames || '[]');
+    const catVals = JSON.parse(el.dataset.catvals || '[]');
+    const draw = () => {
+      const barEl = document.getElementById('analyticsBar');
+      const donutEl = document.getElementById('analyticsDonut');
+      if (barEl && window.Chart) {
+        if (barEl._ci) barEl._ci.destroy();
+        barEl._ci = new window.Chart(barEl, {
+          type: 'bar',
+          data: { labels, datasets: [
+            { label: 'รายรับ', data: rev, backgroundColor: '#8B1A1A' },
+            { label: 'รายจ่าย', data: exp, backgroundColor: '#9ca3af' },
+            { label: 'กำไร', data: profit, backgroundColor: '#16a34a' },
+          ]},
+          options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+            scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v } } } },
         });
       }
-      if (donutEl && catNames.length > 0) {
-        if (donutEl._chartInstance) donutEl._chartInstance.destroy();
-        const donutColors = ["#8B1A1A","#a52222","#c44040","#d97706","#6b7280","#374151"];
-        donutEl._chartInstance = new window.Chart(donutEl, {
-          type: "doughnut",
-          data: { labels: catNames, datasets: [{ data: catVals, backgroundColor: catNames.map((_, i) => donutColors[i] || "#9ca3af"), borderWidth: 0 }] },
-          options: { responsive: true, maintainAspectRatio: false, cutout: "65%", plugins: { legend: { display: false } } },
+      if (donutEl && window.Chart && catNames.length > 0) {
+        if (donutEl._ci) donutEl._ci.destroy();
+        donutEl._ci = new window.Chart(donutEl, {
+          type: 'doughnut',
+          data: { labels: catNames, datasets: [{ data: catVals, backgroundColor: ['#8B1A1A','#a52222','#c44040','#d97706','#6b7280','#374151'], borderWidth: 0 }] },
+          options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: { legend: { display: false } } },
         });
       }
     };
-
-    setTimeout(loadChartJs, 100);
+    if (window.Chart) { setTimeout(draw, 100); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+    s.onload = () => setTimeout(draw, 100);
+    document.head.appendChild(s);
   }, [page, analyticsFilter, orders, expenses]);
+
 
   const navItems = [
     { key: "dashboard", label: "แดชบอร์ด", icon: "barChart" },
