@@ -4,7 +4,7 @@ import {
   fbGetOrders, fbUpsertOrder, fbDeleteOrder,
   fbGetSetting, fbSetSetting,
   fbGetProducts, fbSetProducts,
-  fbOnOrders,
+  fbOnOrders, fbOnExpenses, fbOnExpenseCats,
 } from "./firebase";
 
 /* ═══════════════════════════════════════════
@@ -604,8 +604,20 @@ export default function App() {
         return prevKey !== newKey ? filtered : prev;
       });
     });
+    const unsubExp = fbOnExpenses((incoming) => {
+      if (isEditing.current) return;
+      setExpenses(prev => {
+        const prevKey = prev.map(e => e.id).join(",");
+        const newKey = incoming.map(e => e.id).join(",");
+        return prevKey !== newKey ? incoming : prev;
+      });
+    });
+    const unsubExpCats = fbOnExpenseCats((incoming) => {
+      if (isEditing.current) return;
+      setExpenseCats(prev => JSON.stringify(prev) !== JSON.stringify(incoming) ? incoming : prev);
+    });
     const cleanDel = setInterval(() => deletedIds.current.clear(), 60000);
-    return () => { unsub(); clearInterval(cleanDel); };
+    return () => { unsub(); unsubExp(); unsubExpCats(); clearInterval(cleanDel); };
   }, [loaded]);
 
   const saveSheetUrl = async (url) => { setSheetUrl(url); try { await window.storage.set(SHEET_URL_KEY, url); } catch {} sb.setSetting("sheetUrl", url); };

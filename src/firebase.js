@@ -88,3 +88,25 @@ export function fbOnOrders(callback) {
     callback(orders);
   });
 }
+
+/* ─── EXPENSES REAL-TIME LISTENER ─── */
+export function fbOnExpenses(callback) {
+  return onSnapshot(doc(db, "settings", "expenses"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    } else {
+      callback([]);
+    }
+  });
+}
+
+/* ─── EXPENSE CATEGORIES REAL-TIME LISTENER ─── */
+export function fbOnExpenseCats(callback) {
+  return onSnapshot(doc(db, "settings", "expenseCats"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    }
+  });
+}
