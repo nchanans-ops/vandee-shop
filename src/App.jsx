@@ -2478,12 +2478,15 @@ export default function App() {
         const p = products.find(x => x.id === item.id);
         return ss + (p?.cost || 0) * item.qty;
       }, 0), 0);
-    const totalExp = activeExp.reduce((s, e) => s + (e.amount || 0), 0);
+    // expenses ที่ใช้คำนวณ = ทุกหมวด ยกเว้น "ต้นทุนสินค้า" (เพราะใช้ COGS แทน)
+    const opExp = activeExp.filter(e => e.cat !== 'ต้นทุนสินค้า');
+    const totalExp = opExp.reduce((s, e) => s + (e.amount || 0), 0);
     const netProfit = revenue - cogs - totalExp - totalDiscount;
     const margin = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : '0.0';
 
+    // แสดงในตาราง: แยก COGS (จาก cost×qty) และ OpEx แยกหมวด
     const expByCat = {};
-    activeExp.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
+    opExp.forEach(e => { expByCat[e.cat] = (expByCat[e.cat] || 0) + e.amount; });
     const expCatRows = Object.entries(expByCat).sort((a, b) => b[1] - a[1]);
 
     const productSales = {};
