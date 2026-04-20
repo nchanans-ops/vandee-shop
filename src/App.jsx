@@ -1278,7 +1278,32 @@ export default function App() {
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนสต็อก (ชิ้น)</label><input type="number" value={prodForm.stock} onChange={e => setProdForm(p => ({ ...p, stock: e.target.value }))} placeholder="0" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div style={{ gridColumn: "1/-1" }}><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รายละเอียด</label><input value={prodForm.desc} onChange={e => setProdForm(p => ({ ...p, desc: e.target.value }))} placeholder="คำอธิบายสั้น ๆ" style={inp} onFocus={focus} onBlur={blur} /></div>
             <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมวดหมู่</label><select value={prodForm.cat} onChange={e => setProdForm(p => ({ ...p, cat: e.target.value }))} style={{ ...inp, cursor: "pointer" }}>{categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}</select></div>
-            <div><label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>URL รูปภาพ (ถ้ามี)</label><input value={prodForm.img} onChange={e => setProdForm(p => ({ ...p, img: e.target.value }))} placeholder="https://..." style={inp} onFocus={focus} onBlur={blur} /></div>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รูปภาพสินค้า</label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {prodForm.img && (
+                  <div style={{ position: "relative", width: 80, height: 80 }}>
+                    <img src={prodForm.img} alt="preview" style={{ width: 80, height: 80, borderRadius: 8, objectFit: "cover", border: `1px solid ${C.gray200}` }} onError={e => e.target.style.display = 'none'} />
+                    <button onClick={() => setProdForm(p => ({ ...p, img: "" }))} style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: C.red500, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <Icon name="x" size={10} color="white" sw={2.5} />
+                    </button>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  <label style={{ padding: "8px 14px", borderRadius: 8, border: `1.5px solid ${C.green600}`, background: C.green50, color: C.green700, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                    <Icon name="upload" size={13} color={C.green600} /> อัปโหลดรูป
+                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => {
+                      const f = e.target.files[0];
+                      if (!f) return;
+                      const r = new FileReader();
+                      r.onload = ev => setProdForm(p => ({ ...p, img: ev.target.result }));
+                      r.readAsDataURL(f);
+                    }} />
+                  </label>
+                  <input value={prodForm.img.startsWith("data:") ? "" : prodForm.img} onChange={e => setProdForm(p => ({ ...p, img: e.target.value }))} placeholder="หรือวาง URL รูปภาพ..." style={{ ...inp, fontSize: 12 }} onFocus={focus} onBlur={blur} />
+                </div>
+              </div>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
             <BtnO onClick={cancelEdit}><Icon name="x" size={14} /> ยกเลิก</BtnO>
