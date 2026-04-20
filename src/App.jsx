@@ -137,7 +137,7 @@ const sb = {
 };
 
 // Also keep localStorage as local cache + session/remember
-const STORE_KEYS = { orders: "vandee:orders", products: "vandee:products", categories: "vandee:categories", shipping: "vandee:shipping", credentials: "vandee:credentials" };
+const STORE_KEYS = { orders: "vandee:orders", products: "vandee:products", categories: "vandee:categories", shipping: "vandee:shipping", credentials: "vandee:credentials", expenses: "vandee:expenses", expenseCats: "vandee:expenseCats" };
 const DEFAULT_CREDS = { user: "back-vandee", pass: "vandeesouvenir2026" };
 
 /* Sound effects */
@@ -480,6 +480,15 @@ export default function App() {
   /* Orders state */
   const [orders, setOrders] = useState([]);
 
+  /* Expenses state */
+  const INIT_EXPENSE_CATS = ["ต้นทุนสินค้า","ค่าแพ็คกิ้ง","ค่าขนส่ง","ค่าการตลาด","ค่าสาธารณูปโภค","เงินเดือนพนักงาน","อื่น ๆ"];
+  const [expenses, setExpenses] = useState([]);
+  const [expenseCats, setExpenseCats] = useState(INIT_EXPENSE_CATS);
+  const [expenseForm, setExpenseForm] = useState({ name: "", amount: "", date: new Date().toISOString().slice(0,10), cat: "", note: "" });
+  const [newExpCat, setNewExpCat] = useState("");
+  const [expFilter, setExpFilter] = useState("month");
+  const [expCatFilter, setExpCatFilter] = useState("all");
+
   /* Shipping methods */
   const [shippingMethods, setShippingMethods] = useState([
     { id: "standard", label: "จัดส่งทั่วประเทศ", desc: "Kerry / Flash Express (2-3 วัน)", price: 50, icon: "truck", active: true },
@@ -541,8 +550,8 @@ export default function App() {
   // Load data once on mount
   useEffect(() => {
     (async () => {
-      const [sbOrders, sbProducts, sbCats, sbShipping, sbSheetUrl, sbCreds] = await Promise.all([
-        sb.getOrders(), sb.getProducts(), sb.getSetting("categories"), sb.getSetting("shipping"), sb.getSetting("sheetUrl"), sb.getSetting("credentials"),
+      const [sbOrders, sbProducts, sbCats, sbShipping, sbSheetUrl, sbCreds, sbExpenses, sbExpenseCats] = await Promise.all([
+        sb.getOrders(), sb.getProducts(), sb.getSetting("categories"), sb.getSetting("shipping"), sb.getSetting("sheetUrl"), sb.getSetting("credentials"), sb.getSetting("expenses"), sb.getSetting("expenseCats"),
       ]);
       if (sbOrders && sbOrders.length > 0) setOrders(sbOrders);
       else { const so = await loadStore(STORE_KEYS.orders, null); if (so && so.length > 0) setOrders(so); }
@@ -555,6 +564,10 @@ export default function App() {
       if (sbSheetUrl) setSheetUrl(sbSheetUrl);
       else { try { const r = await window.storage.get(SHEET_URL_KEY); if (r) setSheetUrl(r.value); } catch {} }
       if (sbCreds) setCredentials(sbCreds);
+      if (sbExpenses && sbExpenses.length > 0) setExpenses(sbExpenses);
+      else { const se = await loadStore(STORE_KEYS.expenses, null); if (se && se.length > 0) setExpenses(se); }
+      if (sbExpenseCats && sbExpenseCats.length > 0) setExpenseCats(sbExpenseCats);
+      else { const sec = await loadStore(STORE_KEYS.expenseCats, null); if (sec && sec.length > 0) setExpenseCats(sec); }
       setLoaded(true);
     })();
   }, []);
@@ -574,6 +587,8 @@ export default function App() {
   useEffect(() => { if (loaded) { saveStore(STORE_KEYS.products, products); saveToFirebase(); } }, [products, loaded]);
   useEffect(() => { if (loaded) { saveStore(STORE_KEYS.categories, categories); saveToFirebase(); } }, [categories, loaded]);
   useEffect(() => { if (loaded) { saveStore(STORE_KEYS.shipping, shippingMethods); saveToFirebase(); } }, [shippingMethods, loaded]);
+  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.expenses, expenses); sb.setSetting("expenses", expenses); } }, [expenses, loaded]);
+  useEffect(() => { if (loaded) { saveStore(STORE_KEYS.expenseCats, expenseCats); sb.setSetting("expenseCats", expenseCats); } }, [expenseCats, loaded]);
 
   // Real-time listener via Firebase onSnapshot
   useEffect(() => {
@@ -2056,6 +2071,270 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
   /* ════════════════════════════════════════════════════
      LAYOUT
      ════════════════════════════════════════════════════ */
+  /* ════════════════════════════════════════════════════
+     PAGE: EXPENSES
+     ════════════════════════════════════════════════════ */
+  const renderExpenses = () => {
+    const now = new Date();
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+    const lastMonth = (() => { const d = new Date(now.getFullYear(), now.getMonth()-1, 1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`; })();
+
+    const filterByPeriod = (list) => {
+      if (expFilter === "month") return list.filter(e => e.date?.slice(0,7) === thisMonth);
+      if (expFilter === "lastmonth") return list.filter(e => e.date?.slice(0,7) === lastMonth);
+      if (expFilter === "3months") {
+        const cutoff = new Date(now.getFullYear(), now.getMonth()-2, 1).toISOString().slice(0,7);
+        return list.filter(e => e.date?.slice(0,7) >= cutoff);
+      }
+      return list;
+    };
+
+    const periodExpenses = filterByPeriod(expenses);
+    const filteredExpenses = expCatFilter === "all" ? periodExpenses : periodExpenses.filter(e => e.cat === expCatFilter);
+    const totalAmt = periodExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+    const filteredTotal = filteredExpenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+    // หมวดหมู่ breakdown
+    const catBreakdown = expenseCats.map(cat => {
+      const amt = periodExpenses.filter(e => e.cat === cat).reduce((s, e) => s + (e.amount || 0), 0);
+      return { cat, amt, pct: totalAmt > 0 ? Math.round(amt / totalAmt * 100) : 0 };
+    }).filter(c => c.amt > 0).sort((a, b) => b.amt - a.amt);
+
+    const topCat = catBreakdown[0];
+
+    const addExpense = () => {
+      if (!expenseForm.name || !expenseForm.amount || !expenseForm.date) return;
+      const newExp = {
+        id: "EXP-" + Date.now().toString(36).toUpperCase().slice(-6),
+        name: expenseForm.name,
+        amount: parseFloat(expenseForm.amount) || 0,
+        date: expenseForm.date,
+        cat: expenseForm.cat || expenseCats[0] || "อื่น ๆ",
+        note: expenseForm.note,
+        ts: Date.now(),
+      };
+      isEditing.current = true;
+      setExpenses(prev => [newExp, ...prev]);
+      setExpenseForm({ name: "", amount: "", date: new Date().toISOString().slice(0,10), cat: expenseForm.cat, note: "" });
+      sfx.success();
+      setTimeout(() => { isEditing.current = false; }, 2000);
+    };
+
+    const deleteExpense = (id) => {
+      setConfirmModal({
+        title: "ลบรายจ่าย",
+        message: "ต้องการลบรายการนี้ใช่ไหม?",
+        onConfirm: () => {
+          isEditing.current = true;
+          setExpenses(prev => prev.filter(e => e.id !== id));
+          setConfirmModal(null);
+          sfx.remove();
+          setTimeout(() => { isEditing.current = false; }, 2000);
+        },
+      });
+    };
+
+    const addExpCat = () => {
+      const t = newExpCat.trim();
+      if (!t || expenseCats.includes(t)) return;
+      isEditing.current = true;
+      setExpenseCats(prev => [...prev, t]);
+      setNewExpCat("");
+      setTimeout(() => { isEditing.current = false; }, 2000);
+    };
+
+    const removeExpCat = (cat) => {
+      isEditing.current = true;
+      setExpenseCats(prev => prev.filter(c => c !== cat));
+      setTimeout(() => { isEditing.current = false; }, 2000);
+    };
+
+    const exportExpensesCSV = () => {
+      const headers = ["รหัส","วันที่","รายการ","หมวดหมู่","จำนวน (฿)","หมายเหตุ"];
+      const rows = filteredExpenses.map(e => [e.id, e.date, e.name, e.cat, e.amount, e.note || ""]);
+      downloadCSV(`รายจ่าย_${expFilter}_${new Date().toLocaleDateString("th-TH")}.csv`, headers, rows);
+    };
+
+    const catColors = { "ต้นทุนสินค้า": { bg: "#fce7e7", color: "#8B1A1A" }, "ค่าแพ็คกิ้ง": { bg: "#fce7e7", color: "#a52222" }, "ค่าขนส่ง": { bg: "#f0fdf4", color: "#166534" }, "ค่าการตลาด": { bg: "#eff6ff", color: "#1e40af" }, "ค่าสาธารณูปโภค": { bg: "#fefce8", color: "#854d0e" }, "เงินเดือนพนักงาน": { bg: "#f5f3ff", color: "#5b21b6" } };
+    const getCatColor = (cat) => catColors[cat] || { bg: C.gray100, color: C.gray600 };
+
+    return (
+      <div data-page="expenses">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: C.gray900 }}>รายจ่าย</div>
+            <div style={{ fontSize: 13, color: C.gray400, marginTop: 2 }}>ติดตามต้นทุนและค่าใช้จ่ายร้านค้า</div>
+          </div>
+        </div>
+
+        {/* Summary cards */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 12, marginBottom: 20 }}>
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
+            <div style={{ fontSize: 12, color: C.gray400, fontWeight: 600, marginBottom: 6 }}>รายจ่ายช่วงนี้</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: C.gray900 }}>{totalAmt.toLocaleString()}฿</div>
+            <div style={{ fontSize: 11, color: C.gray400, marginTop: 4 }}>{periodExpenses.length} รายการ</div>
+          </div>
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
+            <div style={{ fontSize: 12, color: C.gray400, fontWeight: 600, marginBottom: 6 }}>หมวดหมู่สูงสุด</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: C.gray900 }}>{topCat?.cat || "-"}</div>
+            <div style={{ fontSize: 11, color: C.gray400, marginTop: 4 }}>{topCat ? `${topCat.amt.toLocaleString()}฿ · ${topCat.pct}%` : "ยังไม่มีข้อมูล"}</div>
+          </div>
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: "16px 20px" }}>
+            <div style={{ fontSize: 12, color: C.gray400, fontWeight: 600, marginBottom: 6 }}>หมวดหมู่ทั้งหมด</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: C.gray900 }}>{expenseCats.length}</div>
+            <div style={{ fontSize: 11, color: C.gray400, marginTop: 4 }}>หมวดหมู่</div>
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "320px minmax(0,1fr)", gap: 16, alignItems: "flex-start" }}>
+
+          {/* Left: form + category manager */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Add expense form */}
+            <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon name="plus" size={15} color={C.green600} /> บันทึกรายจ่ายใหม่
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>รายการ</label>
+                  <input value={expenseForm.name} onChange={e => setExpenseForm(p => ({ ...p, name: e.target.value }))} placeholder="เช่น ค่าแพ็คกิ้ง, ซื้อสต็อก..." style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} onKeyDown={e => e.key === "Enter" && addExpense()} />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>จำนวนเงิน (฿)</label>
+                    <input type="number" min="0" value={expenseForm.amount} onChange={e => setExpenseForm(p => ({ ...p, amount: e.target.value }))} placeholder="0" style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>วันที่</label>
+                    <input type="date" value={expenseForm.date} onChange={e => setExpenseForm(p => ({ ...p, date: e.target.value }))} style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมวดหมู่</label>
+                  <select value={expenseForm.cat || expenseCats[0] || ""} onChange={e => setExpenseForm(p => ({ ...p, cat: e.target.value }))} style={{ ...inp, fontSize: 13, background: C.white }}>
+                    {expenseCats.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: C.gray500, marginBottom: 4, display: "block" }}>หมายเหตุ (ไม่บังคับ)</label>
+                  <input value={expenseForm.note} onChange={e => setExpenseForm(p => ({ ...p, note: e.target.value }))} placeholder="รายละเอียดเพิ่มเติม..." style={{ ...inp, fontSize: 13 }} onFocus={focus} onBlur={blur} />
+                </div>
+                <BtnP onClick={addExpense} disabled={!expenseForm.name || !expenseForm.amount} style={{ width: "100%", marginTop: 4 }}>
+                  <Icon name="plus" size={14} /> บันทึกรายจ่าย
+                </BtnP>
+              </div>
+            </div>
+
+            {/* Category manager */}
+            <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, padding: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: C.gray900, marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                <Icon name="grid" size={15} color={C.gray500} /> จัดการหมวดหมู่
+              </div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                <input value={newExpCat} onChange={e => setNewExpCat(e.target.value)} placeholder="ชื่อหมวดหมู่ใหม่..." style={{ ...inp, fontSize: 12, flex: 1 }} onFocus={focus} onBlur={blur} onKeyDown={e => e.key === "Enter" && addExpCat()} />
+                <BtnP onClick={addExpCat} style={{ padding: "8px 14px", flexShrink: 0 }}><Icon name="plus" size={14} /></BtnP>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {expenseCats.map(cat => (
+                  <div key={cat} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 20, background: C.gray100, fontSize: 12, fontWeight: 600, color: C.gray700 }}>
+                    {cat}
+                    {expenseCats.length > 1 && (
+                      <button onClick={() => removeExpCat(cat)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", color: C.gray400 }}>
+                        <Icon name="x" size={11} color={C.gray400} sw={2.5} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Category breakdown */}
+              {catBreakdown.length > 0 && (
+                <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${C.gray100}` }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: C.gray400, marginBottom: 10 }}>สัดส่วนหมวดหมู่ (ช่วงนี้)</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {catBreakdown.map(c => (
+                      <div key={c.cat}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                          <span style={{ color: C.gray700 }}>{c.cat}</span>
+                          <span style={{ color: C.gray400 }}>{c.amt.toLocaleString()}฿ · {c.pct}%</span>
+                        </div>
+                        <div style={{ background: C.gray100, borderRadius: 4, height: 5 }}>
+                          <div style={{ background: C.green600, width: `${c.pct}%`, height: 5, borderRadius: 4, transition: "width 0.3s" }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: expense list */}
+          <div style={{ background: C.white, border: `1px solid ${C.gray100}`, borderRadius: 12, overflow: "hidden" }}>
+            {/* Filter bar */}
+            <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.gray100}`, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <select value={expFilter} onChange={e => setExpFilter(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }}>
+                <option value="month">เดือนนี้</option>
+                <option value="lastmonth">เดือนที่แล้ว</option>
+                <option value="3months">3 เดือนล่าสุด</option>
+                <option value="all">ทั้งหมด</option>
+              </select>
+              <select value={expCatFilter} onChange={e => setExpCatFilter(e.target.value)} style={{ ...inp, width: "auto", padding: "7px 10px", fontSize: 12 }}>
+                <option value="all">ทุกหมวดหมู่</option>
+                {expenseCats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <div style={{ marginLeft: "auto", fontSize: 12, color: C.gray400 }}>{filteredExpenses.length} รายการ</div>
+              <BtnO onClick={exportExpensesCSV} style={{ padding: "7px 12px", fontSize: 12 }}><Icon name="download" size={13} /> Export CSV</BtnO>
+            </div>
+
+            {/* Table header */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 100px 90px 36px", padding: "9px 20px", background: C.gray50, fontSize: 11, fontWeight: 600, color: C.gray400 }}>
+              <span>รายการ</span><span>หมวดหมู่</span><span>วันที่</span><span style={{ textAlign: "right" }}>จำนวน</span><span />
+            </div>
+
+            {/* Rows */}
+            {filteredExpenses.length === 0 ? (
+              <div style={{ padding: 48, textAlign: "center" }}>
+                <Icon name="fileText" size={28} color={C.gray200} />
+                <div style={{ marginTop: 10, fontSize: 13, color: C.gray400 }}>ยังไม่มีรายจ่ายในช่วงเวลานี้</div>
+              </div>
+            ) : (
+              <div>
+                {filteredExpenses.map((e, i) => {
+                  const cc = getCatColor(e.cat);
+                  return (
+                    <div key={e.id} style={{ display: "grid", gridTemplateColumns: "1fr 110px 100px 90px 36px", padding: "12px 20px", borderBottom: i < filteredExpenses.length - 1 ? `1px solid ${C.gray100}` : "none", alignItems: "center", fontSize: 13 }}>
+                      <div>
+                        <div style={{ fontWeight: 600, color: C.gray900 }}>{e.name}</div>
+                        {e.note && <div style={{ fontSize: 11, color: C.gray400, marginTop: 1 }}>{e.note}</div>}
+                      </div>
+                      <span style={{ display: "inline-flex", alignItems: "center" }}>
+                        <span style={{ fontSize: 11, padding: "3px 8px", borderRadius: 20, background: cc.bg, color: cc.color, fontWeight: 600 }}>{e.cat}</span>
+                      </span>
+                      <span style={{ color: C.gray400, fontSize: 12 }}>{e.date ? new Date(e.date).toLocaleDateString("th-TH") : "-"}</span>
+                      <span style={{ textAlign: "right", fontWeight: 700, color: C.gray900 }}>{(e.amount || 0).toLocaleString()}฿</span>
+                      <button onClick={() => deleteExpense(e.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon name="trash" size={14} color={C.gray300} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Footer total */}
+            <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.gray100}`, display: "flex", justifyContent: "space-between", alignItems: "center", background: C.gray50 }}>
+              <span style={{ fontSize: 13, color: C.gray400 }}>รวม {filteredExpenses.length} รายการที่แสดง</span>
+              <span style={{ fontSize: 16, fontWeight: 800, color: C.gray900 }}>{filteredTotal.toLocaleString()}฿</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const navItems = [
     { key: "dashboard", label: "แดชบอร์ด", icon: "barChart" },
     { key: "shop", label: "หน้าร้าน", icon: "shoppingCart" },
@@ -2063,6 +2342,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
     { key: "products", label: "จัดการสินค้า", icon: "grid" },
     { key: "categories", label: "จัดการหมวดหมู่", icon: "list" },
     { key: "shipping", label: "วิธีจัดส่ง", icon: "truck" },
+    { key: "expenses", label: "รายจ่าย", icon: "creditCard" },
     { key: "print", label: "พิมพ์ที่อยู่", icon: "printer" },
     { key: "settings", label: "ตั้งค่า", icon: "save" },
   ];
@@ -2251,6 +2531,7 @@ function doGet() { return ContentService.createTextOutput("VANDEE SHOP API Ready
         {page === "products" && renderProducts()}
         {page === "categories" && renderCategories()}
         {page === "shipping" && renderShipping()}
+        {page === "expenses" && renderExpenses()}
         {page === "print" && renderPrint()}
         {page === "settings" && renderSettings()}
       </div>
