@@ -110,3 +110,45 @@ export function fbOnExpenseCats(callback) {
     }
   });
 }
+
+/* ─── PRODUCTS REAL-TIME ─── */
+export function fbOnProducts(callback) {
+  return onSnapshot(doc(db, "settings", "products_main"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    }
+  });
+}
+
+/* ─── CATEGORIES REAL-TIME ─── */
+export function fbOnCategories(callback) {
+  return onSnapshot(doc(db, "settings", "categories"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    }
+  });
+}
+
+/* ─── SHIPPING REAL-TIME ─── */
+export function fbOnShipping(callback) {
+  return onSnapshot(doc(db, "settings", "shipping"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    }
+  });
+}
+
+/* ─── LOTS REAL-TIME ─── */
+export function fbOnLots(callback) {
+  return onSnapshot(doc(db, "settings", "lots"), (snap) => {
+    if (snap.exists()) {
+      const val = snap.data().value;
+      callback(Array.isArray(val) ? val : []);
+    } else {
+      callback([]);
+    }
+  });
+}

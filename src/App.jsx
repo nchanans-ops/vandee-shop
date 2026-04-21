@@ -5,6 +5,7 @@ import {
   fbGetSetting, fbSetSetting,
   fbGetProducts, fbSetProducts,
   fbOnOrders, fbOnExpenses, fbOnExpenseCats,
+  fbOnProducts, fbOnCategories, fbOnShipping, fbOnLots,
 } from "./firebase";
 
 /* ═══════════════════════════════════════════
@@ -607,6 +608,7 @@ export default function App() {
   // Real-time listener via Firebase onSnapshot
   useEffect(() => {
     if (!loaded) return;
+
     const unsub = fbOnOrders((incoming) => {
       if (isEditing.current) return;
       const filtered = incoming.filter(o => !deletedIds.current.has(o.id));
@@ -616,6 +618,33 @@ export default function App() {
         return prevKey !== newKey ? filtered : prev;
       });
     });
+
+    const unsubProducts = fbOnProducts((incoming) => {
+      if (isEditing.current) return;
+      if (incoming.length > 0) {
+        setProducts(prev => {
+          const prevKey = prev.map(p => p.id + p.stock + p.active).join(",");
+          const newKey = incoming.map(p => p.id + p.stock + p.active).join(",");
+          return prevKey !== newKey ? incoming : prev;
+        });
+      }
+    });
+
+    const unsubCats = fbOnCategories((incoming) => {
+      if (isEditing.current) return;
+      setCategories(prev => JSON.stringify(prev) !== JSON.stringify(incoming) ? incoming : prev);
+    });
+
+    const unsubShipping = fbOnShipping((incoming) => {
+      if (isEditing.current) return;
+      if (incoming.length > 0) setShippingMethods(prev => JSON.stringify(prev) !== JSON.stringify(incoming) ? incoming : prev);
+    });
+
+    const unsubLots = fbOnLots((incoming) => {
+      if (isEditing.current) return;
+      setLots(prev => JSON.stringify(prev) !== JSON.stringify(incoming) ? incoming : prev);
+    });
+
     const unsubExp = fbOnExpenses((incoming) => {
       if (isEditing.current) return;
       setExpenses(prev => {
@@ -624,12 +653,14 @@ export default function App() {
         return prevKey !== newKey ? incoming : prev;
       });
     });
+
     const unsubExpCats = fbOnExpenseCats((incoming) => {
       if (isEditing.current) return;
       setExpenseCats(prev => JSON.stringify(prev) !== JSON.stringify(incoming) ? incoming : prev);
     });
+
     const cleanDel = setInterval(() => deletedIds.current.clear(), 60000);
-    return () => { unsub(); unsubExp(); unsubExpCats(); clearInterval(cleanDel); };
+    return () => { unsub(); unsubProducts(); unsubCats(); unsubShipping(); unsubLots(); unsubExp(); unsubExpCats(); clearInterval(cleanDel); };
   }, [loaded]);
 
   const saveSheetUrl = async (url) => { setSheetUrl(url); try { await window.storage.set(SHEET_URL_KEY, url); } catch {} sb.setSetting("sheetUrl", url); };
