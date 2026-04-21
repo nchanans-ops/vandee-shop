@@ -1173,7 +1173,26 @@ export default function App() {
                         return (
                           <button
                             key={s.key}
-                            onClick={() => { const updated = { ...o, status: s.key }; setOrders(prev => prev.map(x => x.id === o.id ? updated : x)); sb.upsertOrder(updated); syncOrder(updated); }}
+                            onClick={() => {
+                              const updated = { ...o, status: s.key };
+                              // คืนสต็อกถ้าเปลี่ยนเป็น cancelled
+                              if (s.key === 'cancelled' && o.status !== 'cancelled') {
+                                setProducts(prev => prev.map(p => {
+                                  const item = o.items?.find(i => i.id === p.id);
+                                  return item ? { ...p, stock: (p.stock || 0) + item.qty } : p;
+                                }));
+                              }
+                              // คืนกลับถ้าเปลี่ยนจาก cancelled เป็นอื่น
+                              if (o.status === 'cancelled' && s.key !== 'cancelled') {
+                                setProducts(prev => prev.map(p => {
+                                  const item = o.items?.find(i => i.id === p.id);
+                                  return item ? { ...p, stock: Math.max(0, (p.stock || 0) - item.qty) } : p;
+                                }));
+                              }
+                              setOrders(prev => prev.map(x => x.id === o.id ? updated : x));
+                              sb.upsertOrder(updated);
+                              syncOrder(updated);
+                            }}
                             style={{
                               flex: 1, padding: "10px 8px", border: "none",
                               borderRight: idx < 3 ? `1px solid ${C.gray200}` : "none",
@@ -1210,6 +1229,11 @@ export default function App() {
                         onConfirm: async () => {
                           deletedIds.current.add(o.id);
                           await sb.deleteOrder(o.id);
+                          // คืนสต็อก
+                          setProducts(prev => prev.map(p => {
+                            const item = o.items?.find(i => i.id === p.id);
+                            return item ? { ...p, stock: (p.stock || 0) + item.qty } : p;
+                          }));
                           setOrders(prev => prev.filter(x => x.id !== o.id));
                           setExpandedOrder(null);
                           setConfirmModal(null);
